@@ -26,31 +26,39 @@ interface Gig {
 }
 
 async function getAgents(): Promise<Agent[]> {
-  const res = await fetch(
-    'https://backend.benbond.dev/wp-json/app/v1/db/agents?where=status:eq:active&order=is_featured:desc',
-    {
-      headers: {
-        'Authorization': `Bearer ${process.env.PRESSBASE_SERVICE_KEY}`,
-      },
-      next: { revalidate: 60 }
-    }
-  );
-  const data = await res.json();
-  return data.ok ? data.data : [];
+  try {
+    const res = await fetch(
+      'https://backend.benbond.dev/wp-json/app/v1/db/agents?where=status:eq:active',
+      {
+        headers: {
+          'Authorization': `Bearer ${process.env.PRESSBASE_SERVICE_KEY}`,
+        },
+        next: { revalidate: 60 }
+      }
+    );
+    const json = await res.json();
+    return json.ok && json.data?.data ? json.data.data : [];
+  } catch {
+    return [];
+  }
 }
 
 async function getGigs(): Promise<Gig[]> {
-  const res = await fetch(
-    'https://backend.benbond.dev/wp-json/app/v1/db/gigs?where=status:eq:active&order=created_at:desc',
-    {
-      headers: {
-        'Authorization': `Bearer ${process.env.PRESSBASE_SERVICE_KEY}`,
-      },
-      next: { revalidate: 60 }
-    }
-  );
-  const data = await res.json();
-  return data.ok ? data.data : [];
+  try {
+    const res = await fetch(
+      'https://backend.benbond.dev/wp-json/app/v1/db/gigs?where=status:eq:active',
+      {
+        headers: {
+          'Authorization': `Bearer ${process.env.PRESSBASE_SERVICE_KEY}`,
+        },
+        next: { revalidate: 60 }
+      }
+    );
+    const json = await res.json();
+    return json.ok && json.data?.data ? json.data.data : [];
+  } catch {
+    return [];
+  }
 }
 
 export default async function Home() {
