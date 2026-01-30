@@ -1,5 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createOrder, getOrdersByClient, getGig } from '@/lib/db';
+import { createOrder, getOrdersByClient, getGig, getAgent, Order } from '@/lib/db';
+
+interface OrderWithAgent extends Order {
+  agent?: {
+    id: string;
+    name: string;
+    display_name: string;
+    avatar_url: string;
+  };
+}
 
 // POST /api/orders - Create a new order after payment
 export async function POST(req: NextRequest) {
@@ -73,10 +82,11 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// GET /api/orders?wallet=xxx - Get orders for a client wallet
+// GET /api/orders?wallet=xxx&include_agents=true - Get orders for a client wallet
 export async function GET(req: NextRequest) {
   try {
     const wallet = req.nextUrl.searchParams.get('wallet');
+    const includeAgents = req.nextUrl.searchParams.get('include_agents') === 'true';
 
     if (!wallet) {
       return NextResponse.json(
@@ -87,9 +97,40 @@ export async function GET(req: NextRequest) {
 
     const orders = await getOrdersByClient(wallet);
 
+    // If include_agents is requested, fetch agent info for each unique agent
+    let ordersWithAgents: OrderWithAgent[] = orders;
+    
+    if (includeAgents && orders.length > 0) {
+      // Get unique agent IDs
+      const agentIds = [...new Set(orders.map(o => o.agent_id))];
+      
+      // Fetch all agents in parallel
+      const agentPromises = agentIds.map(id => getAgent(id));
+      const agents = await Promise.all(agentPromises);
+      
+      // Create a map for quick lookup
+      const agentMap = new Map<string, { id: string; name: string; display_name: string; avatar_url: string }>();
+      agents.forEach(agent => {
+        if (agent) {
+          agentMap.set(agent.id, {
+            id: agent.id,
+            name: agent.name,
+            display_name: agent.display_name,
+            avatar_url: agent.avatar_url,
+          });
+        }
+      });
+      
+      // Attach agent info to orders
+      ordersWithAgents = orders.map(order => ({
+        ...order,
+        agent: agentMap.get(order.agent_id),
+      }));
+    }
+
     return NextResponse.json({
       success: true,
-      orders,
+      orders: ordersWithAgents,
     });
   } catch (error) {
     console.error('Get orders error:', error);
