@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrder, updateOrderStatus } from '@/lib/db';
 import { canTransition, TransitionAction, OrderStatus } from '@/lib/order-state-machine';
-import { releaseEscrow, disputeEscrow, getEscrowByOrder } from '@/lib/escrow';
+import { releaseEscrow, disputeEscrow, getEscrow } from '@/lib/escrow';
 
 /**
  * POST /api/orders/[id]/transition
@@ -89,26 +89,35 @@ export async function POST(
 
     // Handle escrow actions based on transition
     let escrowAction: string | null = null;
+    let escrowError: string | null = null;
     
     if (result.newStatus === 'completed' && order.escrow_id) {
       // Release escrow when order is accepted/completed
-      const escrowResult = await releaseEscrow(order.escrow_id);
+      const escrowResult = await releaseEscrow(order.escrow_id, order.client_wallet);
       if (escrowResult.ok) {
         escrowAction = 'released';
         console.log('Escrow released:', order.escrow_id);
       } else {
         console.warn('Failed to release escrow:', escrowResult.error);
+        escrowError = escrowResult.error || 'Unknown error';
       }
     }
     
     if (result.newStatus === 'disputed' && order.escrow_id) {
       // Dispute escrow when order is disputed
-      const escrowResult = await disputeEscrow(order.escrow_id, reason || 'Client raised dispute');
+      const disputeReason = reason || 'Client raised dispute';
+      const escrowResult = await disputeEscrow(
+        order.escrow_id, 
+        disputeReason,
+        `Dispute for order ${orderId}`,
+        order.client_wallet
+      );
       if (escrowResult.ok) {
         escrowAction = 'disputed';
         console.log('Escrow disputed:', order.escrow_id);
       } else {
         console.warn('Failed to dispute escrow:', escrowResult.error);
+        escrowError = escrowResult.error || 'Unknown error';
       }
     }
 
@@ -120,6 +129,7 @@ export async function POST(
       role,
       reason,
       escrowAction,
+      escrowError,
     });
 
     return NextResponse.json({
@@ -128,6 +138,7 @@ export async function POST(
       previousStatus: order.status,
       newStatus: result.newStatus,
       escrowAction,
+      escrowError,
     });
   } catch (error) {
     console.error('Order transition error:', error);

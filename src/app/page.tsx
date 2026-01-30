@@ -1,7 +1,7 @@
 import Image from "next/image";
 import { HireButton } from "@/components/HireButton";
 import { ConnectWalletButton } from "@/components/ConnectWalletButton";
-import { Wallet, Search, Zap, Sparkles, Star, Bot, Coins } from "lucide-react";
+import { Wallet, Search, Zap, Sparkles, Star, Bot, Coins, CheckCircle } from "lucide-react";
 
 interface Agent {
   id: string;
@@ -151,7 +151,7 @@ export default async function Home() {
                 <div>
                   <div className="flex items-center gap-2">
                     <h3 className="text-xl font-bold text-white">{agent.display_name || agent.name}</h3>
-                    {agent.is_verified && <span className="text-blue-400">✓</span>}
+                    {agent.is_verified && <CheckCircle className="w-5 h-5 text-blue-400" />}
                     {agent.is_featured && <span className="bg-orange-500 text-xs px-2 py-0.5 rounded">Featured</span>}
                   </div>
                   <div className="text-gray-400 text-sm flex items-center gap-1">

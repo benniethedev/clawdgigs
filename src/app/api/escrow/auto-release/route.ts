@@ -1,12 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getPendingAutoReleaseEscrows, releaseEscrow } from '@/lib/escrow';
 import { updateOrderStatus } from '@/lib/db';
 
 /**
  * POST /api/escrow/auto-release
  * 
- * Process escrows that are past their auto-release deadline.
- * Should be called by a cron job (e.g., every hour).
+ * Note: Auto-release is now handled by the api.solpay.cash escrow service.
+ * This endpoint is kept for backward compatibility and manual checks.
+ * 
+ * The escrow service automatically releases funds when:
+ * 1. All required proof checks pass
+ * 2. The time_lock proof check expires (7 days by default)
+ * 
+ * This endpoint can be used to manually trigger a check or
+ * to sync order statuses after auto-release.
  * 
  * Headers:
  * - X-Cron-Secret: shared secret to authenticate cron calls
@@ -25,50 +31,20 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Get all escrows past their release deadline
-    const pendingEscrows = await getPendingAutoReleaseEscrows();
-    
-    if (pendingEscrows.length === 0) {
-      return NextResponse.json({
-        success: true,
-        message: 'No escrows pending auto-release',
-        processed: 0,
-      });
-    }
+    // Auto-release is now handled by api.solpay.cash
+    // This endpoint is a no-op but kept for compatibility
+    console.log('Auto-release check: Handled by api.solpay.cash escrow service');
 
-    const results: { escrowId: string; success: boolean; error?: string }[] = [];
-
-    for (const escrow of pendingEscrows) {
-      try {
-        const result = await releaseEscrow(escrow.id);
-        
-        if (result.ok) {
-          // Update order status to completed
-          await updateOrderStatus(escrow.order_id, 'completed');
-          results.push({ escrowId: escrow.id, success: true });
-          console.log(`Auto-released escrow ${escrow.id} for order ${escrow.order_id}`);
-        } else {
-          results.push({ escrowId: escrow.id, success: false, error: result.error });
-          console.warn(`Failed to auto-release escrow ${escrow.id}:`, result.error);
-        }
-      } catch (err) {
-        results.push({ escrowId: escrow.id, success: false, error: String(err) });
-      }
-    }
-
-    const successCount = results.filter(r => r.success).length;
-    
     return NextResponse.json({
       success: true,
-      message: `Processed ${successCount}/${pendingEscrows.length} escrows`,
-      processed: successCount,
-      total: pendingEscrows.length,
-      results,
+      message: 'Auto-release is handled by the escrow service (api.solpay.cash)',
+      note: 'Escrow funds are automatically released after 7 days if not disputed',
+      processed: 0,
     });
   } catch (error) {
-    console.error('Auto-release error:', error);
+    console.error('Auto-release check error:', error);
     return NextResponse.json(
-      { error: 'Failed to process auto-release' },
+      { error: 'Failed to process auto-release check' },
       { status: 500 }
     );
   }

@@ -8,8 +8,9 @@ import { resolveDispute, getEscrow } from '@/lib/escrow';
  * Resolve a disputed escrow (AI resolution or admin)
  * 
  * Body:
- * - resolution: 'release' | 'refund'
- * - details: string (explanation)
+ * - disputeId: string (the dispute ID from the escrow service)
+ * - resolution: 'refund_buyer' | 'pay_seller' | 'split' | 'other'
+ * - notes: string (explanation)
  * - resolvedBy?: string (default: 'ai')
  */
 export async function POST(
@@ -19,19 +20,26 @@ export async function POST(
   try {
     const { id: escrowId } = await params;
     const body = await req.json();
-    const { resolution, details, resolvedBy = 'ai' } = body;
+    const { disputeId, resolution, notes, resolvedBy = 'ai' } = body;
 
     // Validate required fields
-    if (!resolution || !['release', 'refund'].includes(resolution)) {
+    if (!resolution || !['refund_buyer', 'pay_seller', 'split', 'other'].includes(resolution)) {
       return NextResponse.json(
-        { error: 'Invalid resolution. Must be: release or refund' },
+        { error: 'Invalid resolution. Must be: refund_buyer, pay_seller, split, or other' },
         { status: 400 }
       );
     }
 
-    if (!details) {
+    if (!notes) {
       return NextResponse.json(
-        { error: 'Missing resolution details' },
+        { error: 'Missing resolution notes' },
+        { status: 400 }
+      );
+    }
+
+    if (!disputeId) {
+      return NextResponse.json(
+        { error: 'Missing disputeId' },
         { status: 400 }
       );
     }
@@ -52,8 +60,14 @@ export async function POST(
       );
     }
 
-    // Resolve the escrow
-    const result = await resolveDispute(escrowId, resolution, details, resolvedBy);
+    // Resolve the dispute through the escrow API
+    const result = await resolveDispute(
+      escrowId,
+      disputeId,
+      resolution,
+      notes,
+      resolvedBy
+    );
 
     if (!result.ok) {
       return NextResponse.json(
@@ -63,18 +77,24 @@ export async function POST(
     }
 
     // Update the order status based on resolution
-    const order = await getOrder(escrow.order_id);
-    if (order) {
-      // If released -> completed, if refunded -> cancelled
-      const newOrderStatus = resolution === 'release' ? 'completed' : 'cancelled';
-      await updateOrderStatus(escrow.order_id, newOrderStatus);
+    // Find order by partner_order_id from escrow metadata
+    const orderId = escrow.partner_order_id || (escrow.metadata?.order_id as string);
+    
+    if (orderId) {
+      const order = await getOrder(orderId);
+      if (order) {
+        // If paid to seller -> completed, if refunded -> cancelled
+        const newOrderStatus = resolution === 'pay_seller' ? 'completed' : 'cancelled';
+        await updateOrderStatus(orderId, newOrderStatus);
+      }
     }
 
     console.log('Escrow dispute resolved:', {
       escrowId,
+      disputeId,
       resolution,
       resolvedBy,
-      details,
+      notes,
     });
 
     return NextResponse.json({

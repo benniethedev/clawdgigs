@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { X402_FACILITATOR } from '@/lib/x402';
 import { createOrder, getGig, getAgent, updateOrderEscrow } from '@/lib/db';
 import { notifyAgentOfOrder } from '@/lib/webhook';
-import { createEscrow } from '@/lib/escrow';
+import { createEscrow, markEscrowFunded } from '@/lib/escrow';
 
 export async function POST(req: NextRequest) {
   try {
@@ -80,8 +80,18 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Create the order after successful payment
-    // Status is 'paid' since payment has been verified
+    // Get agent info for escrow
+    const agent = await getAgent(agentId);
+    const gig = await getGig(gigId);
+
+    if (!agent?.wallet_address) {
+      return NextResponse.json(
+        { error: 'Agent wallet not found' },
+        { status: 400 }
+      );
+    }
+
+    // Create the order first (status 'paid')
     const orderResult = await createOrder({
       gig_id: gigId,
       agent_id: agentId,
@@ -94,10 +104,8 @@ export async function POST(req: NextRequest) {
       payment_signature: paymentSignature ? paymentSignature.slice(0, 88) : undefined,
     });
 
-    if (!orderResult.ok) {
+    if (!orderResult.ok || !orderResult.data) {
       console.error('Failed to create order:', orderResult.error);
-      // Payment was successful but order creation failed
-      // In production, you'd want to handle this more gracefully (retry, queue, etc.)
       return NextResponse.json({
         success: true,
         warning: 'Payment verified but order creation failed - please contact support',
@@ -108,45 +116,60 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    const orderId = orderResult.data.id;
+
+    // Create escrow for the payment
+    let escrowId: string | undefined;
+    let escrowError: string | undefined;
+
+    const escrowResult = await createEscrow({
+      orderId,
+      clientWallet: payerWallet,
+      agentWallet: agent.wallet_address,
+      amountUsdc: amount.toString(),
+      description: gig?.title ? `${gig.title} - Order ${orderId.slice(0, 8)}` : undefined,
+    });
+
+    if (escrowResult.ok && escrowResult.data) {
+      escrowId = escrowResult.data.id;
+      
+      // Link escrow to order
+      await updateOrderEscrow(orderId, escrowId);
+      
+      // Mark escrow as funded (payment already verified)
+      const fundResult = await markEscrowFunded(
+        escrowId,
+        paymentSignature || 'demo-tx-sig',
+      );
+      
+      if (fundResult.ok) {
+        console.log('Escrow created and funded:', escrowId);
+      } else {
+        console.warn('Failed to mark escrow as funded:', fundResult.error);
+        escrowError = fundResult.error;
+      }
+    } else {
+      console.warn('Failed to create escrow:', escrowResult.error);
+      escrowError = escrowResult.error;
+      // Continue without escrow - payment still valid
+      // In production, you might want to fail the whole transaction
+    }
+
     console.log('Payment verified and order created:', {
       gigId,
       agentId,
       amount,
       payer: payerWallet,
-      orderId: orderResult.data?.id,
+      orderId,
+      escrowId,
       verified: verifyData,
     });
 
-    // Create escrow for the payment
-    let escrowId: string | undefined;
-    const agent = await getAgent(agentId);
-    
-    if (orderResult.data?.id && agent?.wallet_address) {
-      const escrowResult = await createEscrow({
-        orderId: orderResult.data.id,
-        clientWallet: payerWallet,
-        agentWallet: agent.wallet_address,
-        amountUsdc: amount.toString(),
-      });
-
-      if (escrowResult.ok && escrowResult.data) {
-        escrowId = escrowResult.data.id;
-        // Link escrow to order
-        await updateOrderEscrow(orderResult.data.id, escrowId);
-        console.log('Escrow created:', escrowId);
-      } else {
-        console.warn('Failed to create escrow:', escrowResult.error);
-        // Continue without escrow - payment still valid
-      }
-    }
-
     // Send webhook notification to agent (fire and forget)
     if (agent?.webhook_url && orderResult.data) {
-      const gig = await getGig(gigId);
-      
       // Don't await - let it run in background with its own retry logic
       notifyAgentOfOrder(agent.webhook_url, {
-        orderId: orderResult.data.id,
+        orderId,
         gigId,
         gigTitle: gig?.title || 'Unknown Gig',
         agentId,
@@ -156,6 +179,7 @@ export async function POST(req: NextRequest) {
         requirementsInputs: orderRequirements.inputs,
         requirementsDeliveryPrefs: orderRequirements.deliveryPreferences,
         paymentSignature: paymentSignature?.slice(0, 88),
+        escrowId,
       }).then(result => {
         if (result.success) {
           console.log(`Webhook delivered to agent ${agentId}`, { attempts: result.attempts });
@@ -169,10 +193,13 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: 'Payment verified and order created',
+      message: escrowId 
+        ? 'Payment verified and secured in escrow' 
+        : 'Payment verified and order created',
       txSignature: paymentSignature?.slice(0, 44) || 'demo-sig',
-      orderId: orderResult.data?.id,
+      orderId,
       escrowId,
+      escrowError,
       gigId,
       agentId,
     });

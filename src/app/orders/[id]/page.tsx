@@ -2,12 +2,23 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getOrderWithDelivery, getGig, getAgent, Order, Delivery } from "@/lib/db";
-import { getEscrowByOrder, getEscrowStatusInfo } from "@/lib/escrow";
+import { getEscrow, getEscrowStatusInfo, getAutoReleaseTimeRemaining, Escrow, EscrowIconName } from "@/lib/escrow";
 import { DeliveryViewer } from "@/components/DeliveryViewer";
 import { 
   Clock, CreditCard, Cog, Package, RotateCcw, CheckCircle, 
-  AlertTriangle, XCircle, HelpCircle, FileText, Bot
+  AlertTriangle, XCircle, HelpCircle, FileText, Bot, Lock, Hourglass, Undo2
 } from 'lucide-react';
+
+// Map escrow icon names to Lucide components
+const escrowIconMap: Record<EscrowIconName, React.ReactNode> = {
+  Hourglass: <Hourglass className="w-5 h-5" />,
+  Lock: <Lock className="w-5 h-5" />,
+  CheckCircle: <CheckCircle className="w-5 h-5" />,
+  AlertTriangle: <AlertTriangle className="w-5 h-5" />,
+  Undo2: <Undo2 className="w-5 h-5" />,
+  XCircle: <XCircle className="w-5 h-5" />,
+  Clock: <Clock className="w-5 h-5" />,
+};
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -38,8 +49,9 @@ export default async function OrderDetailPage({ params }: PageProps) {
   const agent = await getAgent(order.agent_id);
   
   // Get escrow info if available
-  const escrow = order.escrow_id ? await getEscrowByOrder(order.id) : null;
+  const escrow = order.escrow_id ? await getEscrow(order.escrow_id) : null;
   const escrowInfo = escrow ? getEscrowStatusInfo(escrow) : null;
+  const autoReleaseInfo = escrow ? getAutoReleaseTimeRemaining(escrow) : null;
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -163,29 +175,25 @@ export default async function OrderDetailPage({ params }: PageProps) {
             <div className="mb-6 p-4 bg-gray-700/30 rounded-xl border border-gray-600">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <span className="text-2xl">{escrowInfo.icon}</span>
+                  <span className={`${escrowInfo.color}`}>{escrowIconMap[escrowInfo.icon]}</span>
                   <div>
                     <div className={`font-semibold ${escrowInfo.color}`}>{escrowInfo.label}</div>
                     <div className="text-gray-400 text-sm">{escrowInfo.description}</div>
                   </div>
                 </div>
-                {escrow.status === 'funded' && escrow.release_deadline && (
+                {escrow.status === 'funded' && autoReleaseInfo && !autoReleaseInfo.expired && (
                   <div className="text-right">
                     <div className="text-gray-400 text-sm">Auto-release</div>
                     <div className="text-white text-sm font-medium">
-                      {new Date(escrow.release_deadline).toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                        year: 'numeric',
-                      })}
+                      {autoReleaseInfo.formattedString}
                     </div>
                   </div>
                 )}
-                {escrow.status === 'released' && escrow.released_at && (
+                {escrow.status === 'released' && escrow.completed_at && (
                   <div className="text-right">
                     <div className="text-gray-400 text-sm">Released</div>
                     <div className="text-green-400 text-sm font-medium">
-                      {new Date(escrow.released_at).toLocaleDateString('en-US', {
+                      {new Date(escrow.completed_at).toLocaleDateString('en-US', {
                         month: 'short',
                         day: 'numeric',
                         year: 'numeric',
@@ -199,16 +207,10 @@ export default async function OrderDetailPage({ params }: PageProps) {
                   </div>
                 )}
               </div>
-              {escrow.dispute_reason && (
+              {escrow.status === 'disputed' && (
                 <div className="mt-3 pt-3 border-t border-gray-600">
-                  <div className="text-gray-400 text-sm mb-1">Dispute Reason</div>
-                  <div className="text-white text-sm">{escrow.dispute_reason}</div>
-                </div>
-              )}
-              {escrow.resolution && (
-                <div className="mt-3 pt-3 border-t border-gray-600">
-                  <div className="text-gray-400 text-sm mb-1">Resolution</div>
-                  <div className="text-white text-sm">{escrow.resolution}</div>
+                  <div className="text-gray-400 text-sm mb-1">Dispute Status</div>
+                  <div className="text-white text-sm">Your dispute is being reviewed. Contact support for details.</div>
                 </div>
               )}
             </div>

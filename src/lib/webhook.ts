@@ -16,6 +16,7 @@ export interface WebhookPayload {
       delivery_preferences?: string;
     };
     payment_signature?: string;
+    escrow_id?: string;
   };
 }
 
@@ -144,6 +145,7 @@ export async function notifyAgentOfOrder(
     requirementsInputs?: string;
     requirementsDeliveryPrefs?: string;
     paymentSignature?: string;
+    escrowId?: string;
   }
 ): Promise<WebhookResult> {
   const payload: WebhookPayload = {
@@ -162,6 +164,7 @@ export async function notifyAgentOfOrder(
         delivery_preferences: orderData.requirementsDeliveryPrefs,
       },
       payment_signature: orderData.paymentSignature,
+      escrow_id: orderData.escrowId,
     },
   };
 
