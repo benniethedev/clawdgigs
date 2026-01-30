@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getOrder, updateOrderStatus } from '@/lib/db';
+import { getOrder, updateOrderStatus, getAgent } from '@/lib/db';
 import { disputeEscrow, getEscrow } from '@/lib/escrow';
 import { canTransition } from '@/lib/order-state-machine';
+import { createDispute, DisputeCategory } from '@/lib/disputes';
 
 /**
  * POST /api/orders/[id]/dispute
@@ -83,9 +84,10 @@ export async function POST(
 
     // Dispute escrow if exists
     let escrowDisputed = false;
+    let escrow = null;
     
     if (order.escrow_id) {
-      const escrow = await getEscrow(order.escrow_id);
+      escrow = await getEscrow(order.escrow_id);
       if (escrow && escrow.status === 'funded') {
         const disputeResult = await disputeEscrow(order.escrow_id, fullReason);
         if (disputeResult.ok) {
@@ -100,8 +102,36 @@ export async function POST(
       }
     }
 
+    // Create dispute record for tracking and resolution
+    let disputeRecord = null;
+    if (escrow) {
+      const agent = await getAgent(order.agent_id);
+      const disputeCategory: DisputeCategory = ['quality', 'incomplete', 'timing', 'communication', 'mismatch', 'other'].includes(category) 
+        ? category as DisputeCategory 
+        : 'other';
+      
+      const createResult = await createDispute({
+        orderId,
+        escrowId: order.escrow_id!,
+        buyerWallet: order.client_wallet,
+        sellerWallet: agent?.wallet_address || escrow.seller_wallet,
+        amountUsdc: parseFloat(order.amount_usdc),
+        category: disputeCategory,
+        reason: reason.trim(),
+        details: details?.trim(),
+      });
+
+      if (createResult.ok) {
+        disputeRecord = createResult.data;
+        console.log('Dispute record created:', disputeRecord?.id);
+      } else {
+        console.warn('Failed to create dispute record:', createResult.error);
+      }
+    }
+
     console.log('Dispute opened:', {
       orderId,
+      disputeId: disputeRecord?.id,
       previousStatus: order.status,
       newStatus: 'disputed',
       category,
@@ -113,11 +143,12 @@ export async function POST(
       success: true,
       message: 'Dispute opened successfully',
       orderId,
+      disputeId: disputeRecord?.id,
       previousStatus: order.status,
       newStatus: 'disputed',
       escrowDisputed,
       disputeInfo: {
-        category: category || 'general',
+        category: category || 'other',
         reason: reason.trim(),
         openedAt: new Date().toISOString(),
       },

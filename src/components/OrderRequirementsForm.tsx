@@ -1,12 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { FileText } from 'lucide-react';
+import { FileText, Mail } from 'lucide-react';
 
 export interface OrderRequirements {
   description: string;
   inputs: string;
   deliveryPreferences: string;
+  email?: string; // Optional email for notifications
 }
 
 interface OrderRequirementsFormProps {
@@ -19,12 +20,24 @@ export function OrderRequirementsForm({ gigTitle, onSubmit, onBack }: OrderRequi
   const [description, setDescription] = useState('');
   const [inputs, setInputs] = useState('');
   const [deliveryPreferences, setDeliveryPreferences] = useState('');
-  const [errors, setErrors] = useState<{ description?: string }>({});
+  const [email, setEmail] = useState('');
+  const [errors, setErrors] = useState<{ description?: string; email?: string }>({});
 
   const handleSubmit = () => {
     // Validate required fields
+    const newErrors: { description?: string; email?: string } = {};
+    
     if (!description.trim()) {
-      setErrors({ description: 'Please describe what you need done' });
+      newErrors.description = 'Please describe what you need done';
+    }
+    
+    // Validate email format if provided
+    if (email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      newErrors.email = 'Please enter a valid email address';
+    }
+    
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
       return;
     }
 
@@ -32,6 +45,7 @@ export function OrderRequirementsForm({ gigTitle, onSubmit, onBack }: OrderRequi
       description: description.trim(),
       inputs: inputs.trim(),
       deliveryPreferences: deliveryPreferences.trim(),
+      email: email.trim() || undefined,
     });
   };
 
@@ -97,6 +111,32 @@ export function OrderRequirementsForm({ gigTitle, onSubmit, onBack }: OrderRequi
           className="w-full bg-gray-700 border border-gray-600 rounded-xl px-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:border-orange-500 transition resize-none"
         />
         <p className="text-gray-500 text-xs mt-1">Specify how you&apos;d like to receive the final deliverables</p>
+      </div>
+
+      {/* Email for Notifications - Optional */}
+      <div>
+        <label className="block text-white font-medium mb-2">
+          <span className="flex items-center gap-2">
+            <Mail className="w-4 h-4 text-orange-400" />
+            Email for Notifications <span className="text-gray-500 font-normal">(optional)</span>
+          </span>
+        </label>
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => {
+            setEmail(e.target.value);
+            if (errors.email) setErrors(prev => ({ ...prev, email: undefined }));
+          }}
+          placeholder="your@email.com"
+          className={`w-full bg-gray-700 border ${
+            errors.email ? 'border-red-500' : 'border-gray-600'
+          } rounded-xl px-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:border-orange-500 transition`}
+        />
+        {errors.email && (
+          <p className="text-red-400 text-sm mt-1">{errors.email}</p>
+        )}
+        <p className="text-gray-500 text-xs mt-1">Get notified when your order is delivered and ready for review</p>
       </div>
 
       {/* Actions */}

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getOrder, updateOrderStatus, createDelivery } from '@/lib/db';
+import { getOrder, updateOrderStatus, createDelivery, getGig, getAgent } from '@/lib/db';
+import { sendGigDeliveredEmail } from '@/lib/email';
 
 // POST /api/orders/[id]/deliver - Agent submits delivery
 export async function POST(
@@ -120,6 +121,31 @@ export async function POST(
 
     // Update order status to delivered
     await updateOrderStatus(orderId, 'delivered');
+
+    // Send delivery notification email to buyer (fire and forget)
+    if (order.buyer_email) {
+      // Get gig and agent info for the email
+      const [gig, agent] = await Promise.all([
+        getGig(order.gig_id),
+        getAgent(order.agent_id),
+      ]);
+
+      sendGigDeliveredEmail({
+        orderId,
+        buyerEmail: order.buyer_email,
+        gigTitle: gig?.title || 'Your Order',
+        agentName: agent?.display_name || agent?.name || 'AI Agent',
+        deliveryNotes: notes,
+      }).then(result => {
+        if (result.success) {
+          console.log(`Delivery notification email sent to ${order.buyer_email}`);
+        } else {
+          console.warn(`Failed to send delivery email:`, result.error);
+        }
+      }).catch(err => {
+        console.error(`Error sending delivery email:`, err);
+      });
+    }
 
     return NextResponse.json({
       success: true,

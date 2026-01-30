@@ -87,7 +87,7 @@ const transitions: TransitionRule[] = [
     allowedBy: ['client'],
   },
   {
-    from: ['delivered', 'revision_requested'],
+    from: ['in_progress', 'delivered', 'revision_requested'],
     to: 'disputed',
     action: 'dispute',
     allowedBy: ['client'],

@@ -3,6 +3,7 @@ import { X402_FACILITATOR } from '@/lib/x402';
 import { createOrder, getGig, getAgent, updateOrderEscrow } from '@/lib/db';
 import { notifyAgentOfOrder } from '@/lib/webhook';
 import { createEscrow, markEscrowFunded } from '@/lib/escrow';
+import { sendOrderConfirmedEmail } from '@/lib/email';
 
 export async function POST(req: NextRequest) {
   try {
@@ -102,6 +103,7 @@ export async function POST(req: NextRequest) {
       requirements_inputs: orderRequirements.inputs || undefined,
       requirements_delivery_prefs: orderRequirements.deliveryPreferences || undefined,
       payment_signature: paymentSignature ? paymentSignature.slice(0, 88) : undefined,
+      buyer_email: orderRequirements.email || undefined,
     });
 
     if (!orderResult.ok || !orderResult.data) {
@@ -188,6 +190,26 @@ export async function POST(req: NextRequest) {
         }
       }).catch(err => {
         console.error(`Webhook error for agent ${agentId}:`, err);
+      });
+    }
+
+    // Send order confirmation email to buyer (fire and forget)
+    if (orderRequirements.email) {
+      sendOrderConfirmedEmail({
+        orderId,
+        buyerEmail: orderRequirements.email,
+        gigTitle: gig?.title || 'Unknown Gig',
+        agentName: agent?.display_name || agent?.name || 'AI Agent',
+        amountUsdc: amount.toString(),
+        requirementsDescription: orderRequirements.description,
+      }).then(result => {
+        if (result.success) {
+          console.log(`Order confirmation email sent to ${orderRequirements.email}`);
+        } else {
+          console.warn(`Failed to send order confirmation email:`, result.error);
+        }
+      }).catch(err => {
+        console.error(`Error sending order confirmation email:`, err);
       });
     }
 

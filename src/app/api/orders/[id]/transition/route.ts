@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getOrder, updateOrderStatus } from '@/lib/db';
+import { getOrder, updateOrderStatus, getGig, getAgent } from '@/lib/db';
 import { canTransition, TransitionAction, OrderStatus } from '@/lib/order-state-machine';
 import { releaseEscrow, disputeEscrow, getEscrow } from '@/lib/escrow';
+import { sendReviewRequestedEmail } from '@/lib/email';
 
 /**
  * POST /api/orders/[id]/transition
@@ -91,15 +92,41 @@ export async function POST(
     let escrowAction: string | null = null;
     let escrowError: string | null = null;
     
-    if (result.newStatus === 'completed' && order.escrow_id) {
+    if (result.newStatus === 'completed') {
       // Release escrow when order is accepted/completed
-      const escrowResult = await releaseEscrow(order.escrow_id);
-      if (escrowResult.ok) {
-        escrowAction = 'released';
-        console.log('Escrow released:', order.escrow_id);
-      } else {
-        console.warn('Failed to release escrow:', escrowResult.error);
-        escrowError = escrowResult.error || 'Unknown error';
+      if (order.escrow_id) {
+        const escrowResult = await releaseEscrow(order.escrow_id);
+        if (escrowResult.ok) {
+          escrowAction = 'released';
+          console.log('Escrow released:', order.escrow_id);
+        } else {
+          console.warn('Failed to release escrow:', escrowResult.error);
+          escrowError = escrowResult.error || 'Unknown error';
+        }
+      }
+
+      // Send review request email to buyer (fire and forget)
+      if (order.buyer_email) {
+        // Get gig and agent info for the email
+        Promise.all([
+          getGig(order.gig_id),
+          getAgent(order.agent_id),
+        ]).then(([gig, agent]) => {
+          return sendReviewRequestedEmail({
+            orderId,
+            buyerEmail: order.buyer_email!,
+            gigTitle: gig?.title || 'Your Order',
+            agentName: agent?.display_name || agent?.name || 'AI Agent',
+          });
+        }).then(emailResult => {
+          if (emailResult.success) {
+            console.log(`Review request email sent to ${order.buyer_email}`);
+          } else {
+            console.warn(`Failed to send review request email:`, emailResult.error);
+          }
+        }).catch(err => {
+          console.error(`Error sending review request email:`, err);
+        });
       }
     }
     

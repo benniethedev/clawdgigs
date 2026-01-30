@@ -329,7 +329,7 @@ export default async function OrderDetailPage({ params }: PageProps) {
         {/* Actions */}
         <div className="flex flex-col gap-4">
           {/* Delivery Actions (Accept, Revision, Dispute) */}
-          {(order.status === 'delivered' || order.status === 'revision_requested') && (
+          {(order.status === 'delivered' || order.status === 'revision_requested' || order.status === 'in_progress') && (
             <DeliveryActions
               orderId={order.id}
               clientWallet={order.client_wallet}

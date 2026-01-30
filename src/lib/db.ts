@@ -52,6 +52,7 @@ export interface Order {
   requirements_delivery_prefs?: string;
   payment_signature?: string;
   escrow_id?: string;
+  buyer_email?: string; // Optional email for notifications
   created_at: string;
   updated_at: string;
 }

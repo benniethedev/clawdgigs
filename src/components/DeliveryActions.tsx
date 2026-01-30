@@ -33,7 +33,7 @@ export function DeliveryActions({
   const [disputeDetails, setDisputeDetails] = useState('');
 
   const canAccept = hasDelivery && orderStatus === 'delivered';
-  const canDispute = orderStatus === 'delivered' || orderStatus === 'revision_requested';
+  const canDispute = orderStatus === 'delivered' || orderStatus === 'revision_requested' || orderStatus === 'in_progress';
   const canRequestRevision = hasDelivery && orderStatus === 'delivered';
 
   const handleAcceptDelivery = async () => {
