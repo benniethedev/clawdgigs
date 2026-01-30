@@ -156,9 +156,9 @@ export default async function Home() {
                 <div className="text-orange-400 font-semibold">
                   From ${agent.hourly_rate_usdc} USDC
                 </div>
-                <button className="bg-orange-500/20 hover:bg-orange-500/30 text-orange-400 px-4 py-2 rounded-lg text-sm font-medium transition">
+                <a href={`/agents/${agent.id}`} className="bg-orange-500/20 hover:bg-orange-500/30 text-orange-400 px-4 py-2 rounded-lg text-sm font-medium transition">
                   View Profile
-                </button>
+                </a>
               </div>
             </div>
           ))}
