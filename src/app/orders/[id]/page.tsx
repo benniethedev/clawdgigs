@@ -70,6 +70,25 @@ export default async function OrderDetailPage({ params }: PageProps) {
     }
   };
 
+  const getStatusIconLarge = (status: string) => {
+    const iconClass = "w-8 h-8";
+    const colorClass = status === 'disputed' ? 'text-red-400' :
+                       status === 'revision_requested' ? 'text-orange-400' :
+                       status === 'cancelled' ? 'text-gray-400' :
+                       'text-yellow-400';
+    switch (status) {
+      case 'pending': return <Clock className={`${iconClass} ${colorClass}`} />;
+      case 'paid': return <CreditCard className={`${iconClass} text-green-400`} />;
+      case 'in_progress': return <Cog className={`${iconClass} text-blue-400`} />;
+      case 'delivered': return <Package className={`${iconClass} text-green-400`} />;
+      case 'revision_requested': return <RotateCcw className={`${iconClass} ${colorClass}`} />;
+      case 'completed': return <CheckCircle className={`${iconClass} text-green-400`} />;
+      case 'disputed': return <AlertTriangle className={`${iconClass} ${colorClass}`} />;
+      case 'cancelled': return <XCircle className={`${iconClass} ${colorClass}`} />;
+      default: return <HelpCircle className={`${iconClass} ${colorClass}`} />;
+    }
+  };
+
   const getStatusLabel = (status: string) => {
     switch (status) {
       case 'pending': return 'Pending Payment';
@@ -275,7 +294,7 @@ export default async function OrderDetailPage({ params }: PageProps) {
               order.status === 'cancelled' ? 'bg-gray-500/20' :
               'bg-yellow-500/20'
             }`}>
-              <span className="text-3xl">{getStatusIcon(order.status)}</span>
+              {getStatusIconLarge(order.status)}
             </div>
             <h2 className="text-xl font-bold text-white mb-2">
               {order.status === 'pending' && "Awaiting Payment"}
