@@ -32,30 +32,14 @@ interface Gig {
   delivery_time: string;
 }
 
-// Placeholder reviews - in production these would come from an API
-const placeholderReviews = [
-  {
-    id: "1",
-    author: "CryptoWhale.sol",
-    rating: 5,
-    comment: "Incredibly fast and accurate. The agent delivered exactly what I needed in under 5 minutes. Will definitely hire again!",
-    date: "2 days ago",
-  },
-  {
-    id: "2",
-    author: "DeFiBuilder",
-    rating: 5,
-    comment: "Best AI agent I've worked with. Professional, thorough, and the x402 payment was seamless.",
-    date: "1 week ago",
-  },
-  {
-    id: "3",
-    author: "SolanaMaxi",
-    rating: 4,
-    comment: "Great work on my project. Minor revision needed but handled it quickly. Recommended!",
-    date: "2 weeks ago",
-  },
-];
+interface Review {
+  id: string;
+  rating: number;
+  review_text: string;
+  client_wallet: string;
+  client_display: string;
+  created_at: string;
+}
 
 async function getAgent(id: string): Promise<Agent | null> {
   try {
@@ -91,6 +75,60 @@ async function getAgentGigs(agentId: string): Promise<Gig[]> {
   } catch {
     return [];
   }
+}
+
+async function getAgentReviews(agentId: string): Promise<{ reviews: Review[]; averageRating: number; totalReviews: number }> {
+  try {
+    const res = await fetch(
+      `https://backend.benbond.dev/wp-json/app/v1/db/reviews?where=agent_id:eq:${agentId}`,
+      {
+        headers: {
+          'Authorization': `Bearer ${process.env.PRESSBASE_SERVICE_KEY}`,
+        },
+        next: { revalidate: 60 }
+      }
+    );
+    const json = await res.json();
+    const rawReviews = json.ok && json.data?.data ? json.data.data : [];
+    
+    // Transform and sort reviews
+    const reviews: Review[] = rawReviews
+      .map((r: { id: string; rating: number | string; review_text: string; client_wallet: string; created_at: string }) => ({
+        id: r.id,
+        rating: Number(r.rating),
+        review_text: r.review_text || '',
+        client_wallet: r.client_wallet,
+        client_display: `${r.client_wallet.slice(0, 4)}...${r.client_wallet.slice(-4)}`,
+        created_at: r.created_at,
+      }))
+      .sort((a: Review, b: Review) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    
+    // Calculate average
+    const totalReviews = reviews.length;
+    const averageRating = totalReviews > 0
+      ? Math.round((reviews.reduce((sum: number, r: Review) => sum + r.rating, 0) / totalReviews) * 10) / 10
+      : 5.0;
+    
+    return { reviews, averageRating, totalReviews };
+  } catch {
+    return { reviews: [], averageRating: 5.0, totalReviews: 0 };
+  }
+}
+
+function formatRelativeDate(dateStr: string): string {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  
+  if (diffDays === 0) return 'Today';
+  if (diffDays === 1) return 'Yesterday';
+  if (diffDays < 7) return `${diffDays} days ago`;
+  if (diffDays < 14) return '1 week ago';
+  if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
+  if (diffDays < 60) return '1 month ago';
+  if (diffDays < 365) return `${Math.floor(diffDays / 30)} months ago`;
+  return `${Math.floor(diffDays / 365)} years ago`;
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
@@ -138,9 +176,11 @@ export default async function AgentProfilePage({ params }: { params: Promise<{ i
   }
 
   const gigs = await getAgentGigs(agent.id);
+  const { reviews, averageRating, totalReviews } = await getAgentReviews(agent.id);
   const skills = agent.skills ? agent.skills.split(',').map(s => s.trim()) : [];
-  const rating = parseFloat(agent.rating) || 5.0;
-  const totalJobs = parseInt(agent.total_jobs) || 0;
+  // Use calculated rating from reviews, fallback to stored rating
+  const rating = totalReviews > 0 ? averageRating : (parseFloat(agent.rating) || 5.0);
+  const reviewCount = totalReviews > 0 ? totalReviews : (parseInt(agent.total_jobs) || 0);
   const displayName = agent.display_name || agent.name;
 
   return (
@@ -213,10 +253,10 @@ export default async function AgentProfilePage({ params }: { params: Promise<{ i
                     <div className="flex items-center gap-1">
                       <span className="text-yellow-400">★</span>
                       <span className="text-white font-semibold">{rating.toFixed(1)}</span>
-                      <span className="text-gray-400">({totalJobs} reviews)</span>
+                      <span className="text-gray-400">({reviewCount} reviews)</span>
                     </div>
                     <div className="text-gray-400">
-                      <span className="text-white font-semibold">{totalJobs}</span> jobs completed
+                      <span className="text-white font-semibold">{reviewCount}</span> jobs completed
                     </div>
                     <div className="text-gray-400">
                       Member since {new Date(agent.created_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
@@ -308,66 +348,78 @@ export default async function AgentProfilePage({ params }: { params: Promise<{ i
                     ))}
                   </div>
                   <span className="text-white font-semibold">{rating.toFixed(1)}</span>
-                  <span className="text-gray-400">({totalJobs} reviews)</span>
+                  <span className="text-gray-400">({reviewCount} reviews)</span>
                 </div>
               </div>
 
-              {/* Rating Breakdown */}
+              {/* Rating Summary */}
               <div className="mb-6 p-4 bg-gray-700/30 rounded-xl">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-                  <div>
-                    <div className="text-2xl font-bold text-white">{rating.toFixed(1)}</div>
-                    <div className="text-gray-400 text-sm">Overall Rating</div>
-                  </div>
-                  <div>
-                    <div className="text-2xl font-bold text-white">5.0</div>
-                    <div className="text-gray-400 text-sm">Communication</div>
-                  </div>
-                  <div>
-                    <div className="text-2xl font-bold text-white">4.9</div>
-                    <div className="text-gray-400 text-sm">Quality</div>
-                  </div>
-                  <div>
-                    <div className="text-2xl font-bold text-white">5.0</div>
-                    <div className="text-gray-400 text-sm">Speed</div>
+                <div className="flex items-center justify-center gap-8">
+                  <div className="text-center">
+                    <div className="text-3xl font-bold text-white">{rating.toFixed(1)}</div>
+                    <div className="flex items-center justify-center mt-1">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <span 
+                          key={star} 
+                          className={star <= Math.round(rating) ? "text-yellow-400" : "text-gray-600"}
+                        >
+                          ★
+                        </span>
+                      ))}
+                    </div>
+                    <div className="text-gray-400 text-sm mt-1">Based on {reviewCount} reviews</div>
                   </div>
                 </div>
               </div>
 
               {/* Review List */}
-              <div className="space-y-4">
-                {placeholderReviews.map((review) => (
-                  <div key={review.id} className="border-b border-gray-700 last:border-0 pb-4 last:pb-0">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-gray-700 rounded-full flex items-center justify-center">
-                          <User className="w-5 h-5 text-gray-400" />
+              {reviews.length > 0 ? (
+                <div className="space-y-4">
+                  {reviews.slice(0, 5).map((review) => (
+                    <div key={review.id} className="border-b border-gray-700 last:border-0 pb-4 last:pb-0">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-orange-500/20 rounded-full flex items-center justify-center">
+                            <User className="w-5 h-5 text-orange-400" />
+                          </div>
+                          <div>
+                            <div className="text-white font-medium">{review.client_display}</div>
+                            <div className="text-gray-400 text-sm">{formatRelativeDate(review.created_at)}</div>
+                          </div>
                         </div>
-                        <div>
-                          <div className="text-white font-medium">{review.author}</div>
-                          <div className="text-gray-400 text-sm">{review.date}</div>
+                        <div className="flex items-center">
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <span 
+                              key={star} 
+                              className={star <= review.rating ? "text-yellow-400 text-sm" : "text-gray-600 text-sm"}
+                            >
+                              ★
+                            </span>
+                          ))}
                         </div>
                       </div>
-                      <div className="flex items-center">
-                        {[1, 2, 3, 4, 5].map((star) => (
-                          <span 
-                            key={star} 
-                            className={star <= review.rating ? "text-yellow-400 text-sm" : "text-gray-600 text-sm"}
-                          >
-                            ★
-                          </span>
-                        ))}
-                      </div>
+                      {review.review_text && (
+                        <p className="text-gray-300 text-sm leading-relaxed">{review.review_text}</p>
+                      )}
                     </div>
-                    <p className="text-gray-300 text-sm leading-relaxed">{review.comment}</p>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <div className="w-16 h-16 bg-gray-700/50 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Star className="w-8 h-8 text-gray-500" />
                   </div>
-                ))}
-              </div>
+                  <p className="text-gray-400">No reviews yet</p>
+                  <p className="text-gray-500 text-sm mt-1">Be the first to work with this agent!</p>
+                </div>
+              )}
 
-              {/* Load More */}
-              <button className="w-full mt-4 py-3 text-orange-400 hover:text-orange-300 font-medium transition">
-                View All Reviews →
-              </button>
+              {/* Show More link if there are more than 5 reviews */}
+              {reviews.length > 5 && (
+                <button className="w-full mt-4 py-3 text-orange-400 hover:text-orange-300 font-medium transition">
+                  View All {reviews.length} Reviews →
+                </button>
+              )}
             </div>
           </div>
 

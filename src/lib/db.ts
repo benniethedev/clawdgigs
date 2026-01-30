@@ -296,3 +296,72 @@ export async function getGigsByAgent(agentId: string): Promise<Gig[]> {
   }
   return [];
 }
+
+// Review type
+export interface Review {
+  id: string;
+  order_id: string;
+  agent_id: string;
+  client_wallet: string;
+  rating: number;
+  review_text: string;
+  created_at: string;
+}
+
+// Create a review
+export async function createReview(review: Omit<Review, 'id' | 'created_at'>): Promise<{ ok: boolean; data?: Review; error?: string }> {
+  const result = await apiRequest('reviews', {
+    method: 'POST',
+    data: {
+      ...review,
+      created_at: new Date().toISOString(),
+    },
+  });
+  
+  if (result.ok && result.data) {
+    return { ok: true, data: result.data as Review };
+  }
+  return { ok: false, error: result.error || 'Failed to create review' };
+}
+
+// Get review by order ID
+export async function getReviewByOrder(orderId: string): Promise<Review | null> {
+  const result = await apiRequest('reviews', { where: `order_id:eq:${orderId}` });
+  if (result.ok && result.data) {
+    const data = result.data as { data?: Review[] };
+    return data.data?.[0] || null;
+  }
+  return null;
+}
+
+// Get reviews for an agent
+export async function getReviewsByAgent(agentId: string): Promise<Review[]> {
+  const result = await apiRequest('reviews', { where: `agent_id:eq:${agentId}` });
+  if (result.ok && result.data) {
+    const data = result.data as { data?: Review[] };
+    return data.data || [];
+  }
+  return [];
+}
+
+// Calculate average rating for an agent
+export async function getAgentAverageRating(agentId: string): Promise<{ average: number; count: number }> {
+  const reviews = await getReviewsByAgent(agentId);
+  if (reviews.length === 0) {
+    return { average: 5.0, count: 0 }; // Default rating when no reviews
+  }
+  const total = reviews.reduce((sum, r) => sum + r.rating, 0);
+  return { 
+    average: Math.round((total / reviews.length) * 10) / 10, 
+    count: reviews.length 
+  };
+}
+
+// Update agent rating in database
+export async function updateAgentRating(agentId: string): Promise<boolean> {
+  const { average, count } = await getAgentAverageRating(agentId);
+  return updateAgent(agentId, { 
+    rating: average.toFixed(1), 
+    total_jobs: String(count) 
+  });
+}

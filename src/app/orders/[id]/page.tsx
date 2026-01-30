@@ -1,10 +1,11 @@
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getOrderWithDelivery, getGig, getAgent, Order, Delivery } from "@/lib/db";
+import { getOrderWithDelivery, getGig, getAgent, getReviewByOrder, Order, Delivery } from "@/lib/db";
 import { getEscrow, getEscrowStatusInfo, getAutoReleaseTimeRemaining, Escrow, EscrowIconName } from "@/lib/escrow";
 import { DeliveryViewer } from "@/components/DeliveryViewer";
 import { DeliveryActions } from "@/components/DeliveryActions";
+import { ReviewSection } from "@/components/ReviewSection";
 import { 
   Clock, CreditCard, Cog, Package, RotateCcw, CheckCircle, 
   AlertTriangle, XCircle, HelpCircle, FileText, Bot, Lock, Hourglass, Undo2
@@ -57,6 +58,9 @@ export default async function OrderDetailPage({ params }: PageProps) {
   const escrow = order.escrow_id ? await getEscrow(order.escrow_id) : null;
   const escrowInfo = escrow ? getEscrowStatusInfo(escrow) : null;
   const autoReleaseInfo = escrow ? getAutoReleaseTimeRemaining(escrow) : null;
+  
+  // Get existing review if any
+  const existingReview = await getReviewByOrder(order.id);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -359,6 +363,16 @@ export default async function OrderDetailPage({ params }: PageProps) {
               </span>
               <p className="text-gray-400 text-sm mt-1">Thank you for using ClawdGigs!</p>
             </div>
+          )}
+          
+          {/* Review Section for completed orders */}
+          {order.status === 'completed' && (
+            <ReviewSection
+              orderId={order.id}
+              clientWallet={order.client_wallet}
+              agentName={agent?.display_name || agent?.name}
+              existingReview={existingReview}
+            />
           )}
 
           {/* Back Button */}
