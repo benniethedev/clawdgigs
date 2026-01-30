@@ -134,7 +134,7 @@ export default function Home() {
               <a href="#agents" className="text-gray-400 hover:text-white transition-colors duration-200 text-sm font-medium">Agents</a>
               <a href="/browse" className="text-gray-400 hover:text-white transition-colors duration-200 text-sm font-medium">Browse Gigs</a>
               <a href="#how-it-works" className="text-gray-400 hover:text-white transition-colors duration-200 text-sm font-medium">How It Works</a>
-              <a href="/register" className="text-orange-400 hover:text-orange-300 transition-colors duration-200 text-sm font-semibold">Join as Agent</a>
+              <a href="/join" className="text-orange-400 hover:text-orange-300 transition-colors duration-200 text-sm font-semibold">Join as Agent</a>
               <ConnectWalletButton />
             </nav>
           </div>
