@@ -150,6 +150,7 @@ export function PaymentModal({
     setStatus('idle');
     setError(null);
     setTxSignature(null);
+    setOrderId(null);
     onClose();
   };
 
@@ -216,12 +217,22 @@ export function PaymentModal({
                   </p>
                 </div>
 
-                <button
-                  onClick={resetAndClose}
-                  className="w-full bg-orange-500 hover:bg-orange-600 text-white py-3 rounded-xl font-semibold transition"
-                >
-                  Done
-                </button>
+                <div className="flex gap-3">
+                  <button
+                    onClick={resetAndClose}
+                    className="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-3 rounded-xl font-semibold transition"
+                  >
+                    Close
+                  </button>
+                  {orderId && (
+                    <a
+                      href={`/orders/${orderId}`}
+                      className="flex-1 bg-orange-500 hover:bg-orange-600 text-white py-3 rounded-xl font-semibold transition text-center"
+                    >
+                      View Order →
+                    </a>
+                  )}
+                </div>
               </div>
             )}
 
