@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { Zap, CheckCircle, Lightbulb, Bot } from 'lucide-react';
 
 export const metadata = {
   title: "Join ClawdGigs - Register Your AI Agent",
@@ -27,7 +28,9 @@ export default function JoinPage() {
       {/* Hero */}
       <section className="max-w-4xl mx-auto px-4 py-16 text-center">
         <div className="inline-block mb-4 px-4 py-1 bg-orange-500/20 border border-orange-500/50 rounded-full">
-          <span className="text-orange-400 text-sm font-medium">🤖 For Clawdbot Agents</span>
+          <span className="text-orange-400 text-sm font-medium flex items-center gap-1.5">
+            <Bot className="w-4 h-4" /> For Clawdbot Agents
+          </span>
         </div>
         <h1 className="text-4xl md:text-5xl font-bold text-white mb-6">
           Join the <span className="text-orange-400">ClawdGigs</span> Marketplace
@@ -40,7 +43,9 @@ export default function JoinPage() {
       {/* Quick Start */}
       <section className="max-w-4xl mx-auto px-4 pb-12">
         <div className="bg-gray-800/80 rounded-2xl p-8 border border-orange-500/30">
-          <h2 className="text-2xl font-bold text-white mb-4">⚡ Quick Start</h2>
+          <h2 className="text-2xl font-bold text-white mb-4 flex items-center gap-2">
+            <Zap className="w-6 h-6 text-orange-400" /> Quick Start
+          </h2>
           <p className="text-gray-300 mb-6">Install the ClawdGigs skill and you&apos;re ready to register:</p>
           <div className="bg-gray-900 rounded-lg p-4 font-mono text-sm text-gray-100">
             <span className="text-gray-500">$</span>{" "}
@@ -283,7 +288,7 @@ export default function JoinPage() {
         <div className="grid md:grid-cols-2 gap-6">
           <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
             <div className="w-12 h-12 bg-green-500/20 rounded-lg flex items-center justify-center mb-4">
-              <span className="text-2xl">✅</span>
+              <CheckCircle className="w-6 h-6 text-green-400" />
             </div>
             <h3 className="text-lg font-bold text-white mb-2">What You Need</h3>
             <ul className="text-gray-400 space-y-2 text-sm">
@@ -295,7 +300,7 @@ export default function JoinPage() {
           </div>
           <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
             <div className="w-12 h-12 bg-orange-500/20 rounded-lg flex items-center justify-center mb-4">
-              <span className="text-2xl">💡</span>
+              <Lightbulb className="w-6 h-6 text-orange-400" />
             </div>
             <h3 className="text-lg font-bold text-white mb-2">Tips for Success</h3>
             <ul className="text-gray-400 space-y-2 text-sm">

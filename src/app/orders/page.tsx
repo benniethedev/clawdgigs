@@ -5,6 +5,10 @@ import Link from "next/link";
 import { useState, useEffect, useCallback } from 'react';
 import { useWallet } from '@/components/WalletProvider';
 import { ConnectWalletButton } from '@/components/ConnectWalletButton';
+import { 
+  Wallet, ClipboardList, Clock, CreditCard, Cog, Package, 
+  RotateCcw, CheckCircle, AlertTriangle, XCircle, HelpCircle 
+} from 'lucide-react';
 
 interface Order {
   id: string;
@@ -60,16 +64,17 @@ export default function OrdersPage() {
   };
 
   const getStatusIcon = (status: string) => {
+    const iconClass = "w-4 h-4";
     switch (status) {
-      case 'pending': return '⏳';
-      case 'paid': return '💳';
-      case 'in_progress': return '⚙️';
-      case 'delivered': return '📦';
-      case 'revision_requested': return '🔄';
-      case 'completed': return '✅';
-      case 'disputed': return '⚠️';
-      case 'cancelled': return '❌';
-      default: return '❓';
+      case 'pending': return <Clock className={iconClass} />;
+      case 'paid': return <CreditCard className={iconClass} />;
+      case 'in_progress': return <Cog className={iconClass} />;
+      case 'delivered': return <Package className={iconClass} />;
+      case 'revision_requested': return <RotateCcw className={iconClass} />;
+      case 'completed': return <CheckCircle className={iconClass} />;
+      case 'disputed': return <AlertTriangle className={iconClass} />;
+      case 'cancelled': return <XCircle className={iconClass} />;
+      default: return <HelpCircle className={iconClass} />;
     }
   };
 
@@ -111,7 +116,7 @@ export default function OrdersPage() {
         {!connected ? (
           <div className="bg-gray-800 rounded-2xl p-12 text-center border border-gray-700">
             <div className="w-20 h-20 bg-orange-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
-              <span className="text-4xl">👛</span>
+              <Wallet className="w-10 h-10 text-orange-400" />
             </div>
             <h2 className="text-xl font-bold text-white mb-4">Connect Your Wallet</h2>
             <p className="text-gray-400 mb-6">Connect your wallet to view your orders and deliveries.</p>
@@ -124,7 +129,7 @@ export default function OrdersPage() {
         ) : orders.length === 0 ? (
           <div className="bg-gray-800 rounded-2xl p-12 text-center border border-gray-700">
             <div className="w-20 h-20 bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-6">
-              <span className="text-4xl">📋</span>
+              <ClipboardList className="w-10 h-10 text-gray-400" />
             </div>
             <h2 className="text-xl font-bold text-white mb-4">No Orders Yet</h2>
             <p className="text-gray-400 mb-6">You haven&apos;t placed any orders yet. Browse gigs to get started!</p>
@@ -173,25 +178,25 @@ export default function OrdersPage() {
                 </div>
                 {order.status === 'delivered' && (
                   <div className="mt-4 pt-4 border-t border-gray-700 flex items-center gap-2 text-green-400">
-                    <span>📦</span>
+                    <Package className="w-4 h-4" />
                     <span className="font-medium">Delivery ready - Click to view</span>
                   </div>
                 )}
                 {order.status === 'revision_requested' && (
                   <div className="mt-4 pt-4 border-t border-gray-700 flex items-center gap-2 text-orange-400">
-                    <span>🔄</span>
+                    <RotateCcw className="w-4 h-4" />
                     <span className="font-medium">Revision in progress</span>
                   </div>
                 )}
                 {order.status === 'disputed' && (
                   <div className="mt-4 pt-4 border-t border-gray-700 flex items-center gap-2 text-red-400">
-                    <span>⚠️</span>
+                    <AlertTriangle className="w-4 h-4" />
                     <span className="font-medium">Dispute pending resolution</span>
                   </div>
                 )}
                 {order.status === 'paid' && (
                   <div className="mt-4 pt-4 border-t border-gray-700 flex items-center gap-2 text-green-400">
-                    <span>💳</span>
+                    <CreditCard className="w-4 h-4" />
                     <span className="font-medium">Payment received - Agent will start soon</span>
                   </div>
                 )}

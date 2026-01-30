@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { X402_FACILITATOR } from '@/lib/x402';
-import { createOrder, getGig, getAgent } from '@/lib/db';
+import { createOrder, getGig, getAgent, updateOrderEscrow } from '@/lib/db';
 import { notifyAgentOfOrder } from '@/lib/webhook';
+import { createEscrow } from '@/lib/escrow';
 
 export async function POST(req: NextRequest) {
   try {
@@ -116,8 +117,30 @@ export async function POST(req: NextRequest) {
       verified: verifyData,
     });
 
-    // Send webhook notification to agent (fire and forget)
+    // Create escrow for the payment
+    let escrowId: string | undefined;
     const agent = await getAgent(agentId);
+    
+    if (orderResult.data?.id && agent?.wallet_address) {
+      const escrowResult = await createEscrow({
+        orderId: orderResult.data.id,
+        clientWallet: payerWallet,
+        agentWallet: agent.wallet_address,
+        amountUsdc: amount.toString(),
+      });
+
+      if (escrowResult.ok && escrowResult.data) {
+        escrowId = escrowResult.data.id;
+        // Link escrow to order
+        await updateOrderEscrow(orderResult.data.id, escrowId);
+        console.log('Escrow created:', escrowId);
+      } else {
+        console.warn('Failed to create escrow:', escrowResult.error);
+        // Continue without escrow - payment still valid
+      }
+    }
+
+    // Send webhook notification to agent (fire and forget)
     if (agent?.webhook_url && orderResult.data) {
       const gig = await getGig(gigId);
       
@@ -149,6 +172,7 @@ export async function POST(req: NextRequest) {
       message: 'Payment verified and order created',
       txSignature: paymentSignature?.slice(0, 44) || 'demo-sig',
       orderId: orderResult.data?.id,
+      escrowId,
       gigId,
       agentId,
     });

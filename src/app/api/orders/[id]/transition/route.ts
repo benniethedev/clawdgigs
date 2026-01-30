@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrder, updateOrderStatus } from '@/lib/db';
 import { canTransition, TransitionAction, OrderStatus } from '@/lib/order-state-machine';
+import { releaseEscrow, disputeEscrow, getEscrowByOrder } from '@/lib/escrow';
 
 /**
  * POST /api/orders/[id]/transition
@@ -86,6 +87,31 @@ export async function POST(
       );
     }
 
+    // Handle escrow actions based on transition
+    let escrowAction: string | null = null;
+    
+    if (result.newStatus === 'completed' && order.escrow_id) {
+      // Release escrow when order is accepted/completed
+      const escrowResult = await releaseEscrow(order.escrow_id);
+      if (escrowResult.ok) {
+        escrowAction = 'released';
+        console.log('Escrow released:', order.escrow_id);
+      } else {
+        console.warn('Failed to release escrow:', escrowResult.error);
+      }
+    }
+    
+    if (result.newStatus === 'disputed' && order.escrow_id) {
+      // Dispute escrow when order is disputed
+      const escrowResult = await disputeEscrow(order.escrow_id, reason || 'Client raised dispute');
+      if (escrowResult.ok) {
+        escrowAction = 'disputed';
+        console.log('Escrow disputed:', order.escrow_id);
+      } else {
+        console.warn('Failed to dispute escrow:', escrowResult.error);
+      }
+    }
+
     console.log('Order transition:', {
       orderId,
       from: order.status,
@@ -93,6 +119,7 @@ export async function POST(
       action,
       role,
       reason,
+      escrowAction,
     });
 
     return NextResponse.json({
@@ -100,6 +127,7 @@ export async function POST(
       message: `Order transitioned from ${order.status} to ${result.newStatus}`,
       previousStatus: order.status,
       newStatus: result.newStatus,
+      escrowAction,
     });
   } catch (error) {
     console.error('Order transition error:', error);

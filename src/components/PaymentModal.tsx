@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useWallet } from './WalletProvider';
 import { OrderRequirementsForm, OrderRequirements } from './OrderRequirementsForm';
+import { Check, X, Zap, Wallet } from 'lucide-react';
 
 interface PaymentModalProps {
   isOpen: boolean;
@@ -170,7 +171,7 @@ export function PaymentModal({
             onClick={resetAndClose}
             className="absolute top-4 right-4 text-gray-400 hover:text-white transition"
           >
-            ✕
+            <X className="w-5 h-5" />
           </button>
         )}
 
@@ -189,7 +190,7 @@ export function PaymentModal({
             {status === 'success' && (
               <div className="text-center">
                 <div className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <span className="text-5xl">✓</span>
+                  <Check className="w-12 h-12 text-green-400" />
                 </div>
                 <h2 className="text-2xl font-bold text-white mb-2">Payment Successful!</h2>
                 <p className="text-gray-400 mb-6">
@@ -211,9 +212,13 @@ export function PaymentModal({
                   </div>
                 )}
 
-                <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-4 mb-6">
-                  <p className="text-orange-300 text-sm">
-                    <span className="font-semibold">{agentName}</span> will begin working on your request immediately.
+                <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 mb-6">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span>🔒</span>
+                    <span className="text-blue-300 font-semibold text-sm">Payment Secured in Escrow</span>
+                  </div>
+                  <p className="text-gray-400 text-xs">
+                    Funds will be released to <span className="text-white">{agentName}</span> when you accept the delivery, or auto-released after 7 days.
                   </p>
                 </div>
 
@@ -240,7 +245,7 @@ export function PaymentModal({
             {status === 'error' && (
               <div className="text-center">
                 <div className="w-20 h-20 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <span className="text-5xl">✕</span>
+                  <X className="w-12 h-12 text-red-400" />
                 </div>
                 <h2 className="text-2xl font-bold text-white mb-2">Payment Failed</h2>
                 <p className="text-gray-400 mb-4">{error || 'An unexpected error occurred'}</p>
@@ -274,7 +279,7 @@ export function PaymentModal({
                 <p className="text-gray-400 text-sm">
                   {status === 'connecting' && 'Please approve the connection in your wallet'}
                   {status === 'signing' && 'Please sign the payment message in your wallet'}
-                  {status === 'verifying' && 'Confirming with x402 facilitator...'}
+                  {status === 'verifying' && 'Creating secure escrow...'}
                 </p>
               </div>
             )}
@@ -284,7 +289,7 @@ export function PaymentModal({
               <>
                 <div className="text-center mb-6">
                   <div className="w-16 h-16 bg-orange-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <span className="text-3xl">⚡</span>
+                    <Zap className="w-8 h-8 text-orange-400" />
                   </div>
                   <h2 className="text-2xl font-bold text-white mb-1">Confirm Payment</h2>
                   <p className="text-gray-400">via x402 Protocol</p>
@@ -330,7 +335,7 @@ export function PaymentModal({
                 {/* Wallet Status */}
                 {connected ? (
                   <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3 mb-6 flex items-center gap-3">
-                    <span className="text-green-400">✓</span>
+                    <Check className="w-5 h-5 text-green-400" />
                     <div>
                       <div className="text-green-400 text-sm font-medium">Wallet Connected</div>
                       <div className="text-gray-400 text-xs font-mono">
@@ -340,7 +345,7 @@ export function PaymentModal({
                   </div>
                 ) : (
                   <div className="bg-gray-700/30 border border-gray-600 rounded-lg p-3 mb-6 flex items-center gap-3">
-                    <span className="text-gray-400">👛</span>
+                    <Wallet className="w-5 h-5 text-gray-400" />
                     <div className="text-gray-400 text-sm">Connect your wallet to pay</div>
                   </div>
                 )}
@@ -365,11 +370,11 @@ export function PaymentModal({
                       </>
                     ) : connected ? (
                       <>
-                        <span>⚡</span> Pay ${amount} USDC
+                        <Zap className="w-5 h-5" /> Pay ${amount} USDC
                       </>
                     ) : (
                       <>
-                        <span>👛</span> Connect Wallet
+                        <Wallet className="w-5 h-5" /> Connect Wallet
                       </>
                     )}
                   </button>
@@ -377,7 +382,7 @@ export function PaymentModal({
 
                 {/* Info */}
                 <p className="text-gray-500 text-xs text-center mt-4">
-                  Powered by SolPay x402 • Settles in ~400ms on Solana
+                  🔒 Secured by SolPay Escrow • Auto-release in 7 days
                 </p>
               </>
             )}

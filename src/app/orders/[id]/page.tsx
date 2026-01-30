@@ -2,7 +2,12 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getOrderWithDelivery, getGig, getAgent, Order, Delivery } from "@/lib/db";
+import { getEscrowByOrder, getEscrowStatusInfo } from "@/lib/escrow";
 import { DeliveryViewer } from "@/components/DeliveryViewer";
+import { 
+  Clock, CreditCard, Cog, Package, RotateCcw, CheckCircle, 
+  AlertTriangle, XCircle, HelpCircle, FileText, Bot
+} from 'lucide-react';
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -31,6 +36,10 @@ export default async function OrderDetailPage({ params }: PageProps) {
   const { order, delivery } = result;
   const gig = await getGig(order.gig_id);
   const agent = await getAgent(order.agent_id);
+  
+  // Get escrow info if available
+  const escrow = order.escrow_id ? await getEscrowByOrder(order.id) : null;
+  const escrowInfo = escrow ? getEscrowStatusInfo(escrow) : null;
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -47,16 +56,17 @@ export default async function OrderDetailPage({ params }: PageProps) {
   };
 
   const getStatusIcon = (status: string) => {
+    const iconClass = "w-4 h-4";
     switch (status) {
-      case 'pending': return '⏳';
-      case 'paid': return '💳';
-      case 'in_progress': return '⚙️';
-      case 'delivered': return '📦';
-      case 'revision_requested': return '🔄';
-      case 'completed': return '✅';
-      case 'disputed': return '⚠️';
-      case 'cancelled': return '❌';
-      default: return '❓';
+      case 'pending': return <Clock className={iconClass} />;
+      case 'paid': return <CreditCard className={iconClass} />;
+      case 'in_progress': return <Cog className={iconClass} />;
+      case 'delivered': return <Package className={iconClass} />;
+      case 'revision_requested': return <RotateCcw className={iconClass} />;
+      case 'completed': return <CheckCircle className={iconClass} />;
+      case 'disputed': return <AlertTriangle className={iconClass} />;
+      case 'cancelled': return <XCircle className={iconClass} />;
+      default: return <HelpCircle className={iconClass} />;
     }
   };
 
@@ -129,6 +139,62 @@ export default async function OrderDetailPage({ params }: PageProps) {
             </div>
           </div>
 
+          {/* Escrow Status */}
+          {escrow && escrowInfo && (
+            <div className="mb-6 p-4 bg-gray-700/30 rounded-xl border border-gray-600">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">{escrowInfo.icon}</span>
+                  <div>
+                    <div className={`font-semibold ${escrowInfo.color}`}>{escrowInfo.label}</div>
+                    <div className="text-gray-400 text-sm">{escrowInfo.description}</div>
+                  </div>
+                </div>
+                {escrow.status === 'funded' && escrow.release_deadline && (
+                  <div className="text-right">
+                    <div className="text-gray-400 text-sm">Auto-release</div>
+                    <div className="text-white text-sm font-medium">
+                      {new Date(escrow.release_deadline).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric',
+                      })}
+                    </div>
+                  </div>
+                )}
+                {escrow.status === 'released' && escrow.released_at && (
+                  <div className="text-right">
+                    <div className="text-gray-400 text-sm">Released</div>
+                    <div className="text-green-400 text-sm font-medium">
+                      {new Date(escrow.released_at).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric',
+                      })}
+                    </div>
+                  </div>
+                )}
+                {escrow.status === 'disputed' && (
+                  <div className="text-right">
+                    <div className="text-orange-400 text-sm font-medium">Under Review</div>
+                  </div>
+                )}
+              </div>
+              {escrow.dispute_reason && (
+                <div className="mt-3 pt-3 border-t border-gray-600">
+                  <div className="text-gray-400 text-sm mb-1">Dispute Reason</div>
+                  <div className="text-white text-sm">{escrow.dispute_reason}</div>
+                </div>
+              )}
+              {escrow.resolution && (
+                <div className="mt-3 pt-3 border-t border-gray-600">
+                  <div className="text-gray-400 text-sm mb-1">Resolution</div>
+                  <div className="text-white text-sm">{escrow.resolution}</div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Gig & Agent Info */}
           {(gig || agent) && (
             <div className="flex items-center gap-4 p-4 bg-gray-700/30 rounded-xl">
@@ -138,7 +204,7 @@ export default async function OrderDetailPage({ params }: PageProps) {
                     {agent.avatar_url ? (
                       <Image src={agent.avatar_url} alt={agent.name} width={48} height={48} className="rounded-lg" />
                     ) : (
-                      <span className="text-xl">🤖</span>
+                      <Bot className="w-6 h-6 text-orange-400" />
                     )}
                   </div>
                   <div>
@@ -162,7 +228,7 @@ export default async function OrderDetailPage({ params }: PageProps) {
         {/* Requirements */}
         <div className="bg-gray-800 rounded-2xl p-6 border border-gray-700 mb-6">
           <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-            <span>📝</span> Your Requirements
+            <FileText className="w-5 h-5 text-orange-400" /> Your Requirements
           </h2>
           <div className="space-y-4">
             <div>
@@ -188,7 +254,7 @@ export default async function OrderDetailPage({ params }: PageProps) {
         {delivery ? (
           <div className="bg-gray-800 rounded-2xl p-6 border border-green-500/30 mb-6">
             <div className="flex items-center gap-2 mb-6">
-              <span className="text-2xl">📦</span>
+              <Package className="w-6 h-6 text-green-400" />
               <h2 className="text-xl font-bold text-white">Delivery</h2>
               <span className="ml-auto text-green-400 text-sm">
                 Delivered {new Date(delivery.delivered_at).toLocaleDateString('en-US', {
@@ -241,9 +307,9 @@ export default async function OrderDetailPage({ params }: PageProps) {
                 <input type="hidden" name="wallet" value={order.client_wallet} />
                 <button 
                   type="submit"
-                  className="w-full bg-green-500 hover:bg-green-600 text-white py-3 rounded-xl font-semibold transition"
+                  className="w-full bg-green-500 hover:bg-green-600 text-white py-3 rounded-xl font-semibold transition flex items-center justify-center gap-2"
                 >
-                  ✅ Accept Delivery
+                  <CheckCircle className="w-5 h-5" /> Accept Delivery
                 </button>
               </form>
               <form action={`/api/orders/${order.id}/transition`} method="POST" className="flex-1">
@@ -252,9 +318,9 @@ export default async function OrderDetailPage({ params }: PageProps) {
                 <input type="hidden" name="wallet" value={order.client_wallet} />
                 <button 
                   type="submit"
-                  className="w-full bg-orange-500 hover:bg-orange-600 text-white py-3 rounded-xl font-semibold transition"
+                  className="w-full bg-orange-500 hover:bg-orange-600 text-white py-3 rounded-xl font-semibold transition flex items-center justify-center gap-2"
                 >
-                  🔄 Request Revision
+                  <RotateCcw className="w-5 h-5" /> Request Revision
                 </button>
               </form>
             </div>
@@ -268,9 +334,9 @@ export default async function OrderDetailPage({ params }: PageProps) {
               <input type="hidden" name="wallet" value={order.client_wallet} />
               <button 
                 type="submit"
-                className="w-full bg-red-500/20 hover:bg-red-500/30 text-red-400 py-3 rounded-xl font-semibold border border-red-500/30 transition"
+                className="w-full bg-red-500/20 hover:bg-red-500/30 text-red-400 py-3 rounded-xl font-semibold border border-red-500/30 transition flex items-center justify-center gap-2"
               >
-                ⚠️ Open Dispute
+                <AlertTriangle className="w-5 h-5" /> Open Dispute
               </button>
             </form>
           )}
@@ -283,9 +349,9 @@ export default async function OrderDetailPage({ params }: PageProps) {
               <input type="hidden" name="wallet" value={order.client_wallet} />
               <button 
                 type="submit"
-                className="w-full bg-gray-600 hover:bg-gray-500 text-gray-300 py-3 rounded-xl font-semibold transition"
+                className="w-full bg-gray-600 hover:bg-gray-500 text-gray-300 py-3 rounded-xl font-semibold transition flex items-center justify-center gap-2"
               >
-                ❌ Cancel Order
+                <XCircle className="w-5 h-5" /> Cancel Order
               </button>
             </form>
           )}
@@ -293,7 +359,9 @@ export default async function OrderDetailPage({ params }: PageProps) {
           {/* Completed Status */}
           {order.status === 'completed' && (
             <div className="bg-green-500/20 border border-green-500/30 rounded-xl p-4 text-center">
-              <span className="text-green-400 font-semibold">✅ Order Completed</span>
+              <span className="text-green-400 font-semibold flex items-center justify-center gap-2">
+                <CheckCircle className="w-5 h-5" /> Order Completed
+              </span>
               <p className="text-gray-400 text-sm mt-1">Thank you for using ClawdGigs!</p>
             </div>
           )}

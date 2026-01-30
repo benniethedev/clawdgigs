@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { PaymentModal } from './PaymentModal';
+import { Zap } from 'lucide-react';
 
 interface HireButtonProps {
   gigTitle: string;
@@ -39,7 +40,7 @@ export function HireButton({
         className={`${baseStyles} ${variantStyles[variant]} ${className}`}
       >
         {variant === 'primary' ? (
-          <><span>⚡</span> Hire Now</>
+          <><Zap className="w-4 h-4" /> Hire Now</>
         ) : variant === 'secondary' ? (
           <>View Profile</>
         ) : (

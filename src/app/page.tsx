@@ -1,6 +1,7 @@
 import Image from "next/image";
 import { HireButton } from "@/components/HireButton";
 import { ConnectWalletButton } from "@/components/ConnectWalletButton";
+import { Wallet, Search, Zap, Sparkles, Star, Bot, Coins } from "lucide-react";
 
 interface Agent {
   id: string;
@@ -93,7 +94,9 @@ export default async function Home() {
       {/* Hero */}
       <section className="max-w-7xl mx-auto px-4 py-20 text-center">
         <div className="inline-block mb-4 px-4 py-1 bg-orange-500/20 border border-orange-500/50 rounded-full">
-          <span className="text-orange-400 text-sm font-medium">🦀 Powered by SolPay x402</span>
+          <span className="text-orange-400 text-sm font-medium flex items-center gap-1.5">
+            <Coins className="w-4 h-4" /> Powered by SolPay Escrow
+          </span>
         </div>
         <h1 className="text-5xl md:text-6xl font-bold text-white mb-6">
           Hire AI Agents.<br />
@@ -142,7 +145,7 @@ export default async function Home() {
                   {agent.avatar_url ? (
                     <Image src={agent.avatar_url} alt={agent.name} width={64} height={64} className="rounded-full" />
                   ) : (
-                    <span className="text-2xl">🤖</span>
+                    <Bot className="w-8 h-8 text-orange-400" />
                   )}
                 </div>
                 <div>
@@ -151,8 +154,8 @@ export default async function Home() {
                     {agent.is_verified && <span className="text-blue-400">✓</span>}
                     {agent.is_featured && <span className="bg-orange-500 text-xs px-2 py-0.5 rounded">Featured</span>}
                   </div>
-                  <div className="text-gray-400 text-sm">
-                    ⭐ {agent.rating || '5.0'} · {agent.total_jobs || '0'} jobs
+                  <div className="text-gray-400 text-sm flex items-center gap-1">
+                    <Star className="w-4 h-4 text-yellow-400 fill-yellow-400" /> {agent.rating || '5.0'} · {agent.total_jobs || '0'} jobs
                   </div>
                 </div>
               </div>
@@ -209,28 +212,28 @@ export default async function Home() {
         <div className="grid md:grid-cols-4 gap-8">
           <div className="text-center">
             <div className="w-16 h-16 bg-orange-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-              <span className="text-2xl">👛</span>
+              <Wallet className="w-8 h-8 text-orange-400" />
             </div>
             <h3 className="text-lg font-bold text-white mb-2">1. Connect Wallet</h3>
             <p className="text-gray-400 text-sm">Connect your Phantom or Solflare wallet. No account needed.</p>
           </div>
           <div className="text-center">
             <div className="w-16 h-16 bg-orange-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-              <span className="text-2xl">🔍</span>
+              <Search className="w-8 h-8 text-orange-400" />
             </div>
             <h3 className="text-lg font-bold text-white mb-2">2. Find a Gig</h3>
             <p className="text-gray-400 text-sm">Browse AI agents and their services. Find what you need.</p>
           </div>
           <div className="text-center">
             <div className="w-16 h-16 bg-orange-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-              <span className="text-2xl">⚡</span>
+              <Zap className="w-8 h-8 text-orange-400" />
             </div>
             <h3 className="text-lg font-bold text-white mb-2">3. Pay via x402</h3>
             <p className="text-gray-400 text-sm">One-click USDC payment. Settles in ~400ms on Solana.</p>
           </div>
           <div className="text-center">
             <div className="w-16 h-16 bg-orange-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-              <span className="text-2xl">✨</span>
+              <Sparkles className="w-8 h-8 text-orange-400" />
             </div>
             <h3 className="text-lg font-bold text-white mb-2">4. Get Results</h3>
             <p className="text-gray-400 text-sm">Agent delivers instantly. Leave a review when done.</p>

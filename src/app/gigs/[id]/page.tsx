@@ -2,6 +2,10 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { HireButton } from "@/components/HireButton";
+import { 
+  Star, Bot, Package, Clock, Lock, Shield, Zap, 
+  RotateCcw, CheckCircle, User 
+} from 'lucide-react';
 
 interface Agent {
   id: string;
@@ -159,7 +163,7 @@ export default async function GigDetailPage({ params }: { params: Promise<{ id: 
                   {gig.category}
                 </span>
                 <span className="bg-gray-700 text-gray-300 text-sm px-3 py-1 rounded-full flex items-center gap-1">
-                  <span>⏱️</span> {gig.delivery_time}
+                  <Clock className="w-4 h-4" /> {gig.delivery_time}
                 </span>
               </div>
 
@@ -199,7 +203,7 @@ export default async function GigDetailPage({ params }: { params: Promise<{ id: 
             {/* What's Included */}
             <div className="bg-gray-800 rounded-2xl p-6 border border-gray-700">
               <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                <span>📦</span> What&apos;s Included
+                <Package className="w-5 h-5 text-orange-400" /> What&apos;s Included
               </h2>
               <ul className="space-y-3">
                 <li className="flex items-center gap-3 text-gray-300">
@@ -225,7 +229,7 @@ export default async function GigDetailPage({ params }: { params: Promise<{ id: 
             {agent && (
               <div className="bg-gray-800 rounded-2xl p-6 border border-gray-700">
                 <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                  <span>🤖</span> About the Agent
+                  <Bot className="w-5 h-5 text-orange-400" /> About the Agent
                 </h2>
                 <div className="flex items-start gap-4">
                   {/* Avatar */}
@@ -240,7 +244,7 @@ export default async function GigDetailPage({ params }: { params: Promise<{ id: 
                           className="rounded-xl object-cover"
                         />
                       ) : (
-                        <span className="text-3xl">🤖</span>
+                        <Bot className="w-10 h-10 text-orange-400" />
                       )}
                     </div>
                   </Link>
@@ -289,7 +293,7 @@ export default async function GigDetailPage({ params }: { params: Promise<{ id: 
             <div className="bg-gray-800 rounded-2xl p-6 border border-gray-700">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                  <span>⭐</span> Reviews for This Gig
+                  <Star className="w-5 h-5 text-yellow-400 fill-yellow-400" /> Reviews for This Gig
                 </h2>
                 <div className="flex items-center gap-2">
                   <div className="flex items-center">
@@ -336,7 +340,7 @@ export default async function GigDetailPage({ params }: { params: Promise<{ id: 
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-gray-700 rounded-full flex items-center justify-center">
-                          <span className="text-gray-400">👤</span>
+                          <User className="w-5 h-5 text-gray-400" />
                         </div>
                         <div>
                           <div className="text-white font-medium">{review.author}</div>
@@ -383,7 +387,7 @@ export default async function GigDetailPage({ params }: { params: Promise<{ id: 
 
                 {/* Delivery Time */}
                 <div className="flex items-center justify-center gap-2 mb-6 p-3 bg-gray-700/50 rounded-xl">
-                  <span className="text-2xl">⏱️</span>
+                  <Clock className="w-6 h-6 text-orange-400" />
                   <div>
                     <div className="text-white font-semibold">{gig.delivery_time}</div>
                     <div className="text-gray-400 text-sm">Delivery Time</div>

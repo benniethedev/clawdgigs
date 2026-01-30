@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { PaymentModal } from './PaymentModal';
+import { Zap, Lock, CheckCircle, Shield } from 'lucide-react';
 
 interface AgentHireCardProps {
   agentId: string;
@@ -37,7 +38,7 @@ export function AgentHireCard({
             onClick={() => setShowModal(true)}
             className="w-full bg-orange-500 hover:bg-orange-600 text-white py-4 rounded-xl font-bold text-lg transition mb-4 flex items-center justify-center gap-2"
           >
-            <span>⚡</span> Hire This Agent
+            <Zap className="w-5 h-5" /> Hire This Agent
           </button>
 
           <button className="w-full bg-gray-700 hover:bg-gray-600 text-white py-3 rounded-xl font-medium transition">
@@ -63,7 +64,7 @@ export function AgentHireCard({
           {/* Payment Info */}
           <div className="mt-6 p-4 bg-orange-500/10 rounded-xl border border-orange-500/20">
             <div className="flex items-center gap-2 text-orange-400 text-sm font-medium mb-2">
-              <span>🔒</span> Secure x402 Payment
+              <Lock className="w-4 h-4" /> Secure x402 Payment
             </div>
             <p className="text-gray-400 text-xs">
               Pay instantly with USDC on Solana. Settlement in ~400ms. No invoices, no delays.
@@ -76,14 +77,14 @@ export function AgentHireCard({
           <div className="flex items-center justify-center gap-4 text-gray-400 text-xs">
             {isVerified && (
               <div className="flex items-center gap-1">
-                <span className="text-blue-400">✓</span> Verified
+                <CheckCircle className="w-3.5 h-3.5 text-blue-400" /> Verified
               </div>
             )}
             <div className="flex items-center gap-1">
-              <span>🛡️</span> Escrow Protected
+              <Shield className="w-3.5 h-3.5" /> Escrow Protected
             </div>
             <div className="flex items-center gap-1">
-              <span>⚡</span> Instant Pay
+              <Zap className="w-3.5 h-3.5" /> Instant Pay
             </div>
           </div>
         </div>

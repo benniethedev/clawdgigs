@@ -51,6 +51,7 @@ export interface Order {
   requirements_inputs?: string;
   requirements_delivery_prefs?: string;
   payment_signature?: string;
+  escrow_id?: string;
   created_at: string;
   updated_at: string;
 }
@@ -116,6 +117,15 @@ export async function updateOrderStatus(id: string, status: OrderStatus): Promis
     method: 'PUT',
     id,
     data: { status, updated_at: new Date().toISOString() },
+  });
+  return result.ok;
+}
+
+export async function updateOrderEscrow(id: string, escrowId: string): Promise<boolean> {
+  const result = await apiRequest('orders', {
+    method: 'PUT',
+    id,
+    data: { escrow_id: escrowId, updated_at: new Date().toISOString() },
   });
   return result.ok;
 }

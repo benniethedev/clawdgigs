@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { AgentHireCard } from "@/components/AgentHireCard";
 import { HireButton } from "@/components/HireButton";
 import { ConnectWalletButton } from "@/components/ConnectWalletButton";
+import { Zap, Star, Bot, Package, CheckCircle, User } from 'lucide-react';
 
 interface Agent {
   id: string;
@@ -165,7 +166,7 @@ export default async function AgentProfilePage({ params }: { params: Promise<{ i
                         className="rounded-2xl object-cover"
                       />
                     ) : (
-                      <span className="text-5xl">🤖</span>
+                      <Bot className="w-16 h-16 text-orange-400" />
                     )}
                   </div>
                 </div>
@@ -175,7 +176,7 @@ export default async function AgentProfilePage({ params }: { params: Promise<{ i
                   <div className="flex items-center gap-3 mb-2">
                     <h1 className="text-3xl font-bold text-white">{displayName}</h1>
                     {agent.is_verified && (
-                      <span className="text-blue-400 text-xl" title="Verified Agent">✓</span>
+                      <CheckCircle className="w-6 h-6 text-blue-400" aria-label="Verified Agent" />
                     )}
                     {agent.is_featured && (
                       <span className="bg-orange-500 text-white text-xs px-2 py-1 rounded font-medium">Featured</span>
@@ -208,7 +209,7 @@ export default async function AgentProfilePage({ params }: { params: Promise<{ i
             {skills.length > 0 && (
               <div className="bg-gray-800 rounded-2xl p-6 border border-gray-700">
                 <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                  <span>⚡</span> Capabilities
+                  <Zap className="w-5 h-5 text-orange-400" /> Capabilities
                 </h2>
                 <div className="flex flex-wrap gap-3">
                   {skills.map((skill, index) => (
@@ -227,7 +228,7 @@ export default async function AgentProfilePage({ params }: { params: Promise<{ i
             {gigs.length > 0 && (
               <div className="bg-gray-800 rounded-2xl p-6 border border-gray-700">
                 <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                  <span>📦</span> Available Gigs
+                  <Package className="w-5 h-5 text-orange-400" /> Available Gigs
                 </h2>
                 <div className="space-y-4">
                   {gigs.map((gig) => (
@@ -269,7 +270,7 @@ export default async function AgentProfilePage({ params }: { params: Promise<{ i
             <div className="bg-gray-800 rounded-2xl p-6 border border-gray-700">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                  <span>⭐</span> Reviews
+                  <Star className="w-5 h-5 text-yellow-400 fill-yellow-400" /> Reviews
                 </h2>
                 <div className="flex items-center gap-2">
                   <div className="flex items-center">
@@ -316,7 +317,7 @@ export default async function AgentProfilePage({ params }: { params: Promise<{ i
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-gray-700 rounded-full flex items-center justify-center">
-                          <span className="text-gray-400">👤</span>
+                          <User className="w-5 h-5 text-gray-400" />
                         </div>
                         <div>
                           <div className="text-white font-medium">{review.author}</div>
