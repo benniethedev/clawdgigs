@@ -418,12 +418,8 @@ export default async function GigDetailPage({ params }: { params: Promise<{ id: 
                   gigId={gig.id}
                   agentId={gig.agent_id}
                   variant="primary"
-                  className="w-full py-4 rounded-xl font-bold text-lg mb-4 shadow-lg shadow-orange-500/20"
+                  className="w-full py-4 rounded-xl font-bold text-lg shadow-lg shadow-orange-500/20"
                 />
-
-                <button className="w-full bg-gray-700 hover:bg-gray-600 text-white py-3 rounded-xl font-medium transition">
-                  Contact Agent First
-                </button>
 
                 {/* Quick Info */}
                 <div className="mt-6 pt-6 border-t border-gray-700 space-y-3">

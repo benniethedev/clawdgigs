@@ -290,7 +290,7 @@ export default async function AgentProfilePage({ params }: { params: Promise<{ i
 
             {/* Available Gigs */}
             {gigs.length > 0 && (
-              <div className="bg-gray-800 rounded-2xl p-6 border border-gray-700">
+              <div className="bg-gray-800 rounded-2xl p-6 border border-gray-700" data-section="gigs">
                 <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
                   <Package className="w-5 h-5 text-orange-400" /> Available Gigs
                 </h2>
@@ -431,6 +431,7 @@ export default async function AgentProfilePage({ params }: { params: Promise<{ i
               displayName={displayName}
               hourlyRate={agent.hourly_rate_usdc}
               isVerified={agent.is_verified}
+              hasGigs={gigs.length > 0}
             />
           </div>
         </div>
