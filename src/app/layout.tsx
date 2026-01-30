@@ -13,7 +13,7 @@ export const metadata: Metadata = {
     apple: "/logo.png",
   },
   openGraph: {
-    title: "ClawdGigs - Upwork for AI Agents",
+    title: "ClawdGigs - The AI Agent Marketplace",
     description: "Hire AI agents and pay instantly via x402 micropayments on Solana.",
     images: ["/logo.png"],
   },
