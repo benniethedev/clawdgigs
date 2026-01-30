@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { getOrderWithDelivery, getGig, getAgent, Order, Delivery } from "@/lib/db";
 import { getEscrow, getEscrowStatusInfo, getAutoReleaseTimeRemaining, Escrow, EscrowIconName } from "@/lib/escrow";
 import { DeliveryViewer } from "@/components/DeliveryViewer";
+import { DeliveryActions } from "@/components/DeliveryActions";
 import { 
   Clock, CreditCard, Cog, Package, RotateCcw, CheckCircle, 
   AlertTriangle, XCircle, HelpCircle, FileText, Bot, Lock, Hourglass, Undo2
@@ -323,47 +324,16 @@ export default async function OrderDetailPage({ params }: PageProps) {
 
         {/* Actions */}
         <div className="flex flex-col gap-4">
-          {/* Delivery Actions */}
-          {delivery && order.status === 'delivered' && (
-            <div className="flex gap-4">
-              <form action={`/api/orders/${order.id}/transition`} method="POST" className="flex-1">
-                <input type="hidden" name="action" value="accept" />
-                <input type="hidden" name="role" value="client" />
-                <input type="hidden" name="wallet" value={order.client_wallet} />
-                <button 
-                  type="submit"
-                  className="w-full bg-green-500 hover:bg-green-600 text-white py-3 rounded-xl font-semibold transition flex items-center justify-center gap-2"
-                >
-                  <CheckCircle className="w-5 h-5" /> Accept Delivery
-                </button>
-              </form>
-              <form action={`/api/orders/${order.id}/transition`} method="POST" className="flex-1">
-                <input type="hidden" name="action" value="request_revision" />
-                <input type="hidden" name="role" value="client" />
-                <input type="hidden" name="wallet" value={order.client_wallet} />
-                <button 
-                  type="submit"
-                  className="w-full bg-orange-500 hover:bg-orange-600 text-white py-3 rounded-xl font-semibold transition flex items-center justify-center gap-2"
-                >
-                  <RotateCcw className="w-5 h-5" /> Request Revision
-                </button>
-              </form>
-            </div>
-          )}
-          
-          {/* Dispute Option (after delivery or during revision) */}
+          {/* Delivery Actions (Accept, Revision, Dispute) */}
           {(order.status === 'delivered' || order.status === 'revision_requested') && (
-            <form action={`/api/orders/${order.id}/transition`} method="POST">
-              <input type="hidden" name="action" value="dispute" />
-              <input type="hidden" name="role" value="client" />
-              <input type="hidden" name="wallet" value={order.client_wallet} />
-              <button 
-                type="submit"
-                className="w-full bg-red-500/20 hover:bg-red-500/30 text-red-400 py-3 rounded-xl font-semibold border border-red-500/30 transition flex items-center justify-center gap-2"
-              >
-                <AlertTriangle className="w-5 h-5" /> Open Dispute
-              </button>
-            </form>
+            <DeliveryActions
+              orderId={order.id}
+              clientWallet={order.client_wallet}
+              orderStatus={order.status}
+              hasDelivery={!!delivery}
+              amount={order.amount_usdc}
+              agentName={agent?.display_name || agent?.name}
+            />
           )}
 
           {/* Cancel Option (before work starts) */}
