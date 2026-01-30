@@ -263,6 +263,44 @@ export async function refundEscrow(
   return { ok: false, error: result.error };
 }
 
+// Split escrow 50/50 between buyer and seller (for partial delivery/shared fault)
+export async function splitEscrow(
+  escrowId: string,
+  splitTxSignature?: string
+): Promise<{ ok: boolean; escrow?: Escrow; buyerRefund: number; sellerPayout: number; error?: string }> {
+  const escrow = await getEscrow(escrowId);
+  if (!escrow) {
+    return { ok: false, error: 'Escrow not found', buyerRefund: 0, sellerPayout: 0 };
+  }
+
+  // Can only split from disputed status
+  if (escrow.status !== 'disputed') {
+    return { ok: false, error: `Cannot split escrow in ${escrow.status} status`, buyerRefund: 0, sellerPayout: 0 };
+  }
+
+  // Calculate 50/50 split (platform fee comes from seller's half)
+  const halfAmount = Math.floor(escrow.amount / 2);
+  const buyerRefund = halfAmount; // Buyer gets 50% back
+  const sellerHalf = escrow.amount - halfAmount; // Seller's half
+  const platformFeeFromSplit = Math.floor(sellerHalf * PLATFORM_FEE_PERCENT / 100);
+  const sellerPayout = sellerHalf - platformFeeFromSplit; // Seller gets 50% minus platform fee
+
+  // Mark escrow as released (we use 'released' status for split as well)
+  const result = await updateEscrow(escrowId, {
+    status: 'released',
+    release_tx_signature: splitTxSignature || `SPLIT-${Date.now()}`,
+    released_at: new Date().toISOString(),
+    // Store split info in description for audit trail
+    description: `${escrow.description} | SPLIT: Buyer refund ${formatEscrowAmount(buyerRefund)}, Seller payout ${formatEscrowAmount(sellerPayout)}`,
+  });
+
+  if (result.ok) {
+    const updatedEscrow = await getEscrow(escrowId);
+    return { ok: true, escrow: updatedEscrow || undefined, buyerRefund, sellerPayout };
+  }
+  return { ok: false, error: result.error, buyerRefund: 0, sellerPayout: 0 };
+}
+
 // Create dispute on escrow
 export async function disputeEscrow(
   escrowId: string, 

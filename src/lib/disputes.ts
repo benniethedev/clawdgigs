@@ -6,9 +6,11 @@ const API_BASE = 'https://backend.benbond.dev/wp-json/app/v1/db';
 export type DisputeStatus = 
   | 'open'           // Newly opened dispute
   | 'under_review'   // Being reviewed
-  | 'ai_arbitrated'  // AI provided recommendation
+  | 'ai_arbitrated'  // AI provided recommendation (needs manual review)
+  | 'auto_resolved'  // AI auto-resolved (high confidence)
   | 'resolved_buyer' // Resolved in favor of buyer (refund)
   | 'resolved_seller'// Resolved in favor of seller (release)
+  | 'resolved_split' // Resolved with 50/50 split
   | 'cancelled';     // Dispute cancelled by buyer
 
 export type DisputeCategory = 
@@ -35,10 +37,11 @@ export interface Dispute {
   ai_recommendation?: 'refund_buyer' | 'pay_seller' | 'partial_refund';
   ai_confidence?: number;
   ai_arbitrated_at?: string;
+  auto_resolved?: boolean;  // True if AI auto-resolved this dispute
   // Resolution fields
-  resolution?: 'refund_buyer' | 'pay_seller';
+  resolution?: 'refund_buyer' | 'pay_seller' | 'split';
   resolution_notes?: string;
-  resolved_by?: string;
+  resolved_by?: string;  // 'ai_auto' for auto-resolution, 'admin' for manual
   resolved_at?: string;
   // Timestamps
   created_at: string;
@@ -225,20 +228,28 @@ export async function markDisputeUnderReview(disputeId: string): Promise<{ ok: b
 // Resolve dispute
 export async function resolveDispute(
   disputeId: string,
-  resolution: 'refund_buyer' | 'pay_seller',
+  resolution: 'refund_buyer' | 'pay_seller' | 'split',
   notes: string,
-  resolvedBy: string = 'admin'
+  resolvedBy: string = 'admin',
+  autoResolved: boolean = false
 ): Promise<{ ok: boolean; dispute?: Dispute; error?: string }> {
   const dispute = await getDispute(disputeId);
   if (!dispute) {
     return { ok: false, error: 'Dispute not found' };
   }
 
-  if (dispute.status === 'resolved_buyer' || dispute.status === 'resolved_seller') {
+  if (dispute.status === 'resolved_buyer' || dispute.status === 'resolved_seller' || dispute.status === 'resolved_split') {
     return { ok: false, error: 'Dispute already resolved' };
   }
 
-  const newStatus: DisputeStatus = resolution === 'refund_buyer' ? 'resolved_buyer' : 'resolved_seller';
+  let newStatus: DisputeStatus;
+  if (resolution === 'refund_buyer') {
+    newStatus = 'resolved_buyer';
+  } else if (resolution === 'pay_seller') {
+    newStatus = 'resolved_seller';
+  } else {
+    newStatus = 'resolved_split';
+  }
 
   const result = await updateDispute(disputeId, {
     status: newStatus,
@@ -246,6 +257,7 @@ export async function resolveDispute(
     resolution_notes: notes,
     resolved_by: resolvedBy,
     resolved_at: new Date().toISOString(),
+    auto_resolved: autoResolved,
   });
 
   if (result.ok) {
@@ -253,6 +265,28 @@ export async function resolveDispute(
     return { ok: true, dispute: updatedDispute || undefined };
   }
   return { ok: false, error: result.error };
+}
+
+// Auto-resolve dispute based on AI recommendation (called when confidence > 85%)
+export async function autoResolveDispute(
+  disputeId: string,
+  aiRecommendation: 'refund_buyer' | 'pay_seller' | 'partial_refund',
+  confidence: number,
+  analysis: string
+): Promise<{ ok: boolean; dispute?: Dispute; error?: string }> {
+  // Map AI recommendation to resolution
+  const resolution: 'refund_buyer' | 'pay_seller' | 'split' = 
+    aiRecommendation === 'refund_buyer' ? 'refund_buyer' :
+    aiRecommendation === 'pay_seller' ? 'pay_seller' : 'split';
+
+  const notes = `[AI Auto-Resolution - ${confidence}% confidence]\n\n${analysis}`;
+  
+  return resolveDispute(disputeId, resolution, notes, 'ai_auto', true);
+}
+
+// Check if dispute should be auto-resolved
+export function shouldAutoResolve(confidence: number): boolean {
+  return confidence >= 85; // Auto-resolve if confidence is 85% or higher
 }
 
 // Cancel dispute (by buyer)
@@ -293,7 +327,13 @@ export function getDisputeStatusInfo(status: DisputeStatus): {
       label: 'AI Reviewed',
       color: 'text-purple-400',
       bgColor: 'bg-purple-500/20',
-      description: 'AI provided recommendation',
+      description: 'AI provided recommendation (needs approval)',
+    },
+    auto_resolved: {
+      label: 'AI Auto-Resolved',
+      color: 'text-cyan-400',
+      bgColor: 'bg-cyan-500/20',
+      description: 'AI automatically resolved (high confidence)',
     },
     resolved_buyer: {
       label: 'Refunded',
@@ -306,6 +346,12 @@ export function getDisputeStatusInfo(status: DisputeStatus): {
       color: 'text-green-400',
       bgColor: 'bg-green-500/20',
       description: 'Seller received payment',
+    },
+    resolved_split: {
+      label: '50/50 Split',
+      color: 'text-orange-400',
+      bgColor: 'bg-orange-500/20',
+      description: 'Funds split between buyer and seller',
     },
     cancelled: {
       label: 'Cancelled',

@@ -205,12 +205,13 @@ export default async function DisputeDetailPage({ params }: PageProps) {
                   dispute.status === 'resolved_buyer' ? 'text-yellow-400' : 'text-green-400'
                 }`}>
                   {dispute.status === 'resolved_buyer' ? 'Buyer Refunded' : 'Seller Paid'}
+                  {dispute.ai_confidence && ` (${dispute.ai_confidence}% confidence)`}
                 </div>
                 {dispute.resolution_notes && (
                   <p className="text-white whitespace-pre-wrap mb-3">{dispute.resolution_notes}</p>
                 )}
                 <div className="text-gray-400 text-sm">
-                  Resolved by {dispute.resolved_by || 'admin'} on {new Date(dispute.resolved_at!).toLocaleDateString()}
+                  Resolved by {dispute.resolved_by === 'ai_auto' ? 'AI (automatic)' : dispute.resolved_by || 'admin'} on {new Date(dispute.resolved_at!).toLocaleDateString()}
                 </div>
               </div>
             )}
@@ -224,6 +225,7 @@ export default async function DisputeDetailPage({ params }: PageProps) {
                 disputeId={dispute.id}
                 hasAiAnalysis={!!dispute.ai_analysis}
                 aiRecommendation={dispute.ai_recommendation}
+                aiConfidence={dispute.ai_confidence}
               />
             )}
 

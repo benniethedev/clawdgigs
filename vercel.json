@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/jobs/auto-release",
+      "schedule": "*/10 * * * *"
+    }
+  ]
+}

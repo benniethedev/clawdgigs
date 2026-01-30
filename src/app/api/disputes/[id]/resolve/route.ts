@@ -72,6 +72,7 @@ export async function POST(
 
     // Process escrow based on resolution
     let escrowResult;
+    
     if (resolution === 'pay_seller') {
       escrowResult = await releaseEscrow(dispute.escrow_id);
     } else {
@@ -98,6 +99,10 @@ export async function POST(
       console.warn('Dispute record update failed, but escrow was processed:', resolveResult.error);
     }
 
+    const outcomeMessage = resolution === 'pay_seller'
+      ? `Seller receives ${formatEscrowAmount(escrow.seller_amount)}`
+      : `Buyer refunded ${formatEscrowAmount(escrow.amount)}`;
+
     console.log('Dispute resolved:', {
       disputeId,
       orderId: dispute.order_id,
@@ -105,14 +110,14 @@ export async function POST(
       resolution,
       resolvedBy,
       amount: formatEscrowAmount(escrow.amount),
-      outcome: resolution === 'pay_seller'
-        ? `Seller receives ${formatEscrowAmount(escrow.seller_amount)}`
-        : `Buyer refunded ${formatEscrowAmount(escrow.amount)}`,
+      outcome: outcomeMessage,
     });
+
+    const resolutionLabel = resolution === 'refund_buyer' ? 'Buyer refunded' : 'Seller paid';
 
     return NextResponse.json({
       success: true,
-      message: `Dispute resolved: ${resolution === 'refund_buyer' ? 'Buyer refunded' : 'Seller paid'}`,
+      message: `Dispute resolved: ${resolutionLabel}`,
       disputeId,
       resolution,
       resolvedBy,
@@ -120,12 +125,14 @@ export async function POST(
       escrow: escrowResult.escrow,
       payout: resolution === 'pay_seller'
         ? {
+            type: 'release',
             sellerWallet: escrow.seller_wallet,
             sellerAmount: formatEscrowAmount(escrow.seller_amount),
             platformFee: formatEscrowAmount(escrow.platform_fee),
             platformWallet: getPlatformWallet(),
           }
         : {
+            type: 'refund',
             buyerWallet: escrow.buyer_wallet,
             refundAmount: formatEscrowAmount(escrow.amount),
           },

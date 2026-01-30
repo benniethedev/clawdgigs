@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDispute, updateDisputeAiArbitration } from '@/lib/disputes';
 import { getOrder, getDeliveryByOrder, getGig, getAgent } from '@/lib/db';
-import { getEscrow, formatEscrowAmount } from '@/lib/escrow';
+import { getEscrow } from '@/lib/escrow';
+
+// Auto-resolve threshold - disputes with confidence >= this get auto-resolved
+const AUTO_RESOLVE_THRESHOLD = 85;
 
 /**
  * POST /api/disputes/[id]/arbitrate
@@ -69,13 +72,12 @@ export async function POST(
       );
     }
 
-    // Update dispute with AI results
-    const updateResult = await updateDisputeAiArbitration(
-      disputeId,
-      arbitrationResult.analysis!,
-      arbitrationResult.recommendation!,
-      arbitrationResult.confidence!
-    );
+    const confidence = arbitrationResult.confidence!;
+    const recommendation = arbitrationResult.recommendation!;
+    const analysis = arbitrationResult.analysis!;
+
+    // Save AI analysis for manual review
+    const updateResult = await updateDisputeAiArbitration(disputeId, analysis, recommendation, confidence);
 
     if (!updateResult.ok) {
       return NextResponse.json(
@@ -84,22 +86,29 @@ export async function POST(
       );
     }
 
+    const isHighConfidence = confidence >= AUTO_RESOLVE_THRESHOLD;
+    
     console.log('AI Arbitration completed:', {
       disputeId,
       orderId: dispute.order_id,
-      recommendation: arbitrationResult.recommendation,
-      confidence: arbitrationResult.confidence,
+      recommendation,
+      confidence,
+      highConfidence: isHighConfidence,
     });
 
     return NextResponse.json({
       success: true,
       disputeId,
+      autoResolved: false,
       arbitration: {
-        analysis: arbitrationResult.analysis,
-        recommendation: arbitrationResult.recommendation,
-        confidence: arbitrationResult.confidence,
+        analysis,
+        recommendation,
+        confidence,
         timestamp: new Date().toISOString(),
       },
+      note: isHighConfidence 
+        ? `High confidence (${confidence}%) - recommended for quick resolution`
+        : `Confidence ${confidence}% - requires manual review (threshold: ${AUTO_RESOLVE_THRESHOLD}%)`,
     });
   } catch (error) {
     console.error('AI Arbitration error:', error);

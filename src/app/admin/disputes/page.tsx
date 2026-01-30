@@ -40,7 +40,7 @@ export default async function DisputeQueuePage() {
     })
   );
 
-  const openCount = disputes.filter(d => ['open', 'under_review', 'ai_arbitrated'].includes(d.status)).length;
+  const openCount = disputes.filter(d => ['open', 'under_review', 'ai_arbitrated'].includes(d.status) && !d.auto_resolved).length;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900">
@@ -91,7 +91,7 @@ export default async function DisputeQueuePage() {
           <div className="space-y-4">
             {enrichedDisputes.map(({ dispute, order, agent }) => {
               const statusInfo = getDisputeStatusInfo(dispute.status);
-              const isPending = ['open', 'under_review', 'ai_arbitrated'].includes(dispute.status);
+              const isPending = ['open', 'under_review', 'ai_arbitrated'].includes(dispute.status) && !dispute.auto_resolved;
               
               return (
                 <Link
@@ -110,8 +110,14 @@ export default async function DisputeQueuePage() {
                         </span>
                         <span className="text-gray-500 text-sm">{dispute.id}</span>
                         {dispute.ai_recommendation && (
-                          <span className="flex items-center gap-1 px-2 py-1 bg-purple-500/20 text-purple-400 text-xs rounded-full">
-                            <Brain className="w-3 h-3" /> AI: {dispute.ai_recommendation.replace('_', ' ')}
+                          <span className={`flex items-center gap-1 px-2 py-1 text-xs rounded-full ${
+                            dispute.ai_confidence && dispute.ai_confidence >= 85 
+                              ? 'bg-cyan-500/20 text-cyan-400' 
+                              : 'bg-purple-500/20 text-purple-400'
+                          }`}>
+                            <Brain className="w-3 h-3" />
+                            {dispute.ai_confidence ? `${dispute.ai_confidence}%` : 'AI'}: {dispute.ai_recommendation.replace('_', ' ')}
+                            {dispute.auto_resolved && ' ✓ Auto'}
                           </span>
                         )}
                       </div>
@@ -161,7 +167,7 @@ export default async function DisputeQueuePage() {
 
         {/* Stats Summary */}
         {disputes.length > 0 && (
-          <div className="mt-8 grid grid-cols-4 gap-4">
+          <div className="mt-8 grid grid-cols-5 gap-4">
             <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
               <div className="text-2xl font-bold text-yellow-400">
                 {disputes.filter(d => d.status === 'open').length}
@@ -175,8 +181,14 @@ export default async function DisputeQueuePage() {
               <div className="text-gray-400 text-sm">AI Reviewed</div>
             </div>
             <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
+              <div className="text-2xl font-bold text-cyan-400">
+                {disputes.filter(d => d.auto_resolved).length}
+              </div>
+              <div className="text-gray-400 text-sm">Auto-Resolved</div>
+            </div>
+            <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
               <div className="text-2xl font-bold text-green-400">
-                {disputes.filter(d => d.status === 'resolved_buyer' || d.status === 'resolved_seller').length}
+                {disputes.filter(d => ['resolved_buyer', 'resolved_seller', 'resolved_split'].includes(d.status)).length}
               </div>
               <div className="text-gray-400 text-sm">Resolved</div>
             </div>

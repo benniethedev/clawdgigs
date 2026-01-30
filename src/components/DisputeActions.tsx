@@ -7,6 +7,7 @@ interface DisputeActionsProps {
   disputeId: string;
   hasAiAnalysis: boolean;
   aiRecommendation?: string | null;
+  aiConfidence?: number | null;
 }
 
 type ActionStatus = 'idle' | 'loading' | 'success' | 'error';
@@ -15,14 +16,17 @@ export function DisputeActions({
   disputeId,
   hasAiAnalysis,
   aiRecommendation,
+  aiConfidence,
 }: DisputeActionsProps) {
   const [status, setStatus] = useState<ActionStatus>('idle');
   const [error, setError] = useState<string | null>(null);
   const [showResolveForm, setShowResolveForm] = useState(false);
-  const [resolution, setResolution] = useState<'refund_buyer' | 'pay_seller'>(
-    aiRecommendation === 'pay_seller' ? 'pay_seller' : 'refund_buyer'
+  const [resolution, setResolution] = useState<'refund_buyer' | 'pay_seller' | 'split'>(
+    aiRecommendation === 'pay_seller' ? 'pay_seller' : 
+    aiRecommendation === 'partial_refund' ? 'split' : 'refund_buyer'
   );
   const [notes, setNotes] = useState('');
+  const [autoResolved, setAutoResolved] = useState(false);
 
   const handleRunAiArbitration = async () => {
     setStatus('loading');
@@ -40,10 +44,15 @@ export function DisputeActions({
         throw new Error(data.error || 'AI arbitration failed');
       }
 
+      // Check if AI auto-resolved the dispute
+      if (data.autoResolved) {
+        setAutoResolved(true);
+      }
+
       setStatus('success');
       setTimeout(() => {
         window.location.reload();
-      }, 1500);
+      }, data.autoResolved ? 2500 : 1500);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
       setStatus('error');
@@ -88,10 +97,14 @@ export function DisputeActions({
 
   if (status === 'success') {
     return (
-      <div className="bg-green-500/20 rounded-xl p-6 border border-green-500/30 text-center">
-        <CheckCircle className="w-12 h-12 text-green-400 mx-auto mb-3" />
-        <div className="text-white font-semibold">Action Completed</div>
-        <div className="text-gray-400 text-sm">Refreshing page...</div>
+      <div className={`${autoResolved ? 'bg-cyan-500/20 border-cyan-500/30' : 'bg-green-500/20 border-green-500/30'} rounded-xl p-6 border text-center`}>
+        <CheckCircle className={`w-12 h-12 ${autoResolved ? 'text-cyan-400' : 'text-green-400'} mx-auto mb-3`} />
+        <div className="text-white font-semibold">
+          {autoResolved ? 'AI Auto-Resolved!' : 'Action Completed'}
+        </div>
+        <div className="text-gray-400 text-sm">
+          {autoResolved ? 'High confidence resolution applied' : 'Refreshing page...'}
+        </div>
       </div>
     );
   }
@@ -159,7 +172,7 @@ export function DisputeActions({
                   <div className={`font-semibold ${resolution === 'refund_buyer' ? 'text-yellow-400' : 'text-white'}`}>
                     Refund Buyer
                   </div>
-                  <div className="text-gray-400 text-xs">Return funds to the buyer</div>
+                  <div className="text-gray-400 text-xs">Return all funds to the buyer</div>
                 </div>
               </label>
               
@@ -182,6 +195,28 @@ export function DisputeActions({
                     Pay Seller
                   </div>
                   <div className="text-gray-400 text-xs">Release funds to the agent</div>
+                </div>
+              </label>
+
+              <label className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer border transition ${
+                resolution === 'split' 
+                  ? 'bg-orange-500/20 border-orange-500/50' 
+                  : 'bg-gray-700 border-gray-600 hover:border-gray-500'
+              }`}>
+                <input
+                  type="radio"
+                  name="resolution"
+                  value="split"
+                  checked={resolution === 'split'}
+                  onChange={(e) => setResolution(e.target.value as 'split')}
+                  className="sr-only"
+                />
+                <AlertTriangle className={`w-5 h-5 ${resolution === 'split' ? 'text-orange-400' : 'text-gray-400'}`} />
+                <div>
+                  <div className={`font-semibold ${resolution === 'split' ? 'text-orange-400' : 'text-white'}`}>
+                    50/50 Split
+                  </div>
+                  <div className="text-gray-400 text-xs">Split funds between both parties</div>
                 </div>
               </label>
             </div>
@@ -223,7 +258,9 @@ export function DisputeActions({
               className={`flex-1 ${
                 resolution === 'refund_buyer' 
                   ? 'bg-yellow-500 hover:bg-yellow-600' 
-                  : 'bg-green-500 hover:bg-green-600'
+                  : resolution === 'pay_seller'
+                  ? 'bg-green-500 hover:bg-green-600'
+                  : 'bg-orange-500 hover:bg-orange-600'
               } disabled:bg-gray-600 text-white py-2 rounded-lg font-semibold transition flex items-center justify-center gap-2`}
             >
               {status === 'loading' ? (
@@ -238,12 +275,57 @@ export function DisputeActions({
         </div>
       )}
 
-      {/* AI Recommendation Hint */}
-      {aiRecommendation && !showResolveForm && (
-        <div className="mt-3 text-center">
-          <span className="text-gray-400 text-xs">
-            AI recommends: <span className="text-purple-400">{aiRecommendation.replace(/_/g, ' ')}</span>
-          </span>
+      {/* AI Confidence & Recommendation */}
+      {hasAiAnalysis && !showResolveForm && (
+        <div className="mt-4 p-3 bg-purple-500/10 border border-purple-500/30 rounded-lg">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-purple-400 text-sm font-semibold flex items-center gap-2">
+              <Brain className="w-4 h-4" /> AI Analysis
+            </span>
+            {aiConfidence && (
+              <span className={`text-sm font-bold ${
+                aiConfidence >= 85 ? 'text-green-400' : 
+                aiConfidence >= 70 ? 'text-yellow-400' : 'text-red-400'
+              }`}>
+                {aiConfidence}%
+              </span>
+            )}
+          </div>
+          
+          {/* Confidence Bar */}
+          {aiConfidence && (
+            <div className="mb-2">
+              <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
+                <div 
+                  className={`h-full transition-all ${
+                    aiConfidence >= 85 ? 'bg-green-400' : 
+                    aiConfidence >= 70 ? 'bg-yellow-400' : 'bg-red-400'
+                  }`}
+                  style={{ width: `${aiConfidence}%` }}
+                />
+              </div>
+              <div className="flex justify-between text-xs mt-1">
+                <span className="text-gray-500">Low</span>
+                <span className={`${aiConfidence >= 85 ? 'text-green-400' : 'text-gray-500'}`}>
+                  {aiConfidence >= 85 ? '✓ Auto-resolve threshold' : 'Auto-resolve: 85%'}
+                </span>
+                <span className="text-gray-500">High</span>
+              </div>
+            </div>
+          )}
+
+          {aiRecommendation && (
+            <div className="text-center">
+              <span className="text-gray-400 text-sm">Recommends: </span>
+              <span className={`text-sm font-semibold ${
+                aiRecommendation === 'pay_seller' ? 'text-green-400' :
+                aiRecommendation === 'refund_buyer' ? 'text-yellow-400' : 'text-orange-400'
+              }`}>
+                {aiRecommendation === 'pay_seller' ? 'Release to Seller' :
+                 aiRecommendation === 'refund_buyer' ? 'Refund Buyer' : '50/50 Split'}
+              </span>
+            </div>
+          )}
         </div>
       )}
     </div>
