@@ -48,10 +48,13 @@ export default function OrdersPage() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'pending': return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30';
+      case 'paid': return 'bg-green-500/20 text-green-400 border-green-500/30';
       case 'in_progress': return 'bg-blue-500/20 text-blue-400 border-blue-500/30';
       case 'delivered': return 'bg-green-500/20 text-green-400 border-green-500/30';
+      case 'revision_requested': return 'bg-orange-500/20 text-orange-400 border-orange-500/30';
       case 'completed': return 'bg-green-500/20 text-green-300 border-green-500/30';
-      case 'cancelled': return 'bg-red-500/20 text-red-400 border-red-500/30';
+      case 'disputed': return 'bg-red-500/20 text-red-400 border-red-500/30';
+      case 'cancelled': return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
       default: return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
     }
   };
@@ -59,11 +62,28 @@ export default function OrdersPage() {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'pending': return '⏳';
+      case 'paid': return '💳';
       case 'in_progress': return '⚙️';
       case 'delivered': return '📦';
+      case 'revision_requested': return '🔄';
       case 'completed': return '✅';
+      case 'disputed': return '⚠️';
       case 'cancelled': return '❌';
       default: return '❓';
+    }
+  };
+
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'pending': return 'Pending Payment';
+      case 'paid': return 'Paid';
+      case 'in_progress': return 'In Progress';
+      case 'delivered': return 'Delivered';
+      case 'revision_requested': return 'Revision Requested';
+      case 'completed': return 'Completed';
+      case 'disputed': return 'Disputed';
+      case 'cancelled': return 'Cancelled';
+      default: return status.replace('_', ' ');
     }
   };
 
@@ -127,7 +147,7 @@ export default function OrdersPage() {
                   <div className="flex-grow">
                     <div className="flex items-center gap-3 mb-2">
                       <span className={`px-3 py-1 rounded-full text-sm font-medium border ${getStatusColor(order.status)}`}>
-                        {getStatusIcon(order.status)} {order.status.replace('_', ' ')}
+                        {getStatusIcon(order.status)} {getStatusLabel(order.status)}
                       </span>
                       <span className="text-gray-400 text-sm">
                         Order #{order.id.slice(0, 8)}
@@ -155,6 +175,24 @@ export default function OrdersPage() {
                   <div className="mt-4 pt-4 border-t border-gray-700 flex items-center gap-2 text-green-400">
                     <span>📦</span>
                     <span className="font-medium">Delivery ready - Click to view</span>
+                  </div>
+                )}
+                {order.status === 'revision_requested' && (
+                  <div className="mt-4 pt-4 border-t border-gray-700 flex items-center gap-2 text-orange-400">
+                    <span>🔄</span>
+                    <span className="font-medium">Revision in progress</span>
+                  </div>
+                )}
+                {order.status === 'disputed' && (
+                  <div className="mt-4 pt-4 border-t border-gray-700 flex items-center gap-2 text-red-400">
+                    <span>⚠️</span>
+                    <span className="font-medium">Dispute pending resolution</span>
+                  </div>
+                )}
+                {order.status === 'paid' && (
+                  <div className="mt-4 pt-4 border-t border-gray-700 flex items-center gap-2 text-green-400">
+                    <span>💳</span>
+                    <span className="font-medium">Payment received - Agent will start soon</span>
                   </div>
                 )}
               </Link>

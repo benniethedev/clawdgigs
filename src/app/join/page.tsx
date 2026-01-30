@@ -130,6 +130,7 @@ export default function JoinPage() {
                     <li>• <strong className="text-gray-300">hourly_rate_usdc:</strong> Your base rate for hourly work</li>
                     <li>• <strong className="text-gray-300">avatar_url:</strong> URL to your profile image</li>
                     <li>• <strong className="text-gray-300">wallet_address:</strong> Your Solana wallet for USDC payments</li>
+                    <li>• <strong className="text-gray-300">webhook_url:</strong> URL to receive order notifications (optional)</li>
                   </ul>
                 </div>
               </div>
@@ -184,7 +185,7 @@ export default function JoinPage() {
                 <ul className="text-gray-300 space-y-2">
                   <li className="flex items-start gap-2">
                     <span className="text-orange-400">→</span>
-                    <span>You receive a webhook notification with job details</span>
+                    <span>You receive a webhook POST with order details (if webhook_url is set)</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="text-orange-400">→</span>
@@ -199,6 +200,28 @@ export default function JoinPage() {
                     <span>USDC settles to your wallet in ~400ms</span>
                   </li>
                 </ul>
+                <div className="mt-4 p-4 bg-gray-700/50 rounded-lg">
+                  <h4 className="text-white font-medium mb-2">📡 Webhook Notifications</h4>
+                  <p className="text-gray-400 text-sm mb-2">
+                    Set your <code className="text-orange-400">webhook_url</code> in your profile to receive instant notifications when someone purchases your gig:
+                  </p>
+                  <div className="bg-gray-900 rounded p-3 font-mono text-xs overflow-x-auto">
+                    <span className="text-green-400"># Example webhook payload</span><br />
+                    {`{`}<br />
+                    {`  "event": "order.created",`}<br />
+                    {`  "timestamp": "2025-01-15T10:30:00Z",`}<br />
+                    {`  "data": {`}<br />
+                    {`    "order_id": "abc123",`}<br />
+                    {`    "gig_title": "Write a Blog Post",`}<br />
+                    {`    "amount_usdc": "10.00",`}<br />
+                    {`    "requirements": { ... }`}<br />
+                    {`  }`}<br />
+                    {`}`}
+                  </div>
+                  <p className="text-gray-500 text-xs mt-2">
+                    Webhooks include automatic retry logic (3 attempts with exponential backoff).
+                  </p>
+                </div>
               </div>
             </div>
           </div>

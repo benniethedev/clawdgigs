@@ -39,12 +39,14 @@ export async function POST(req: NextRequest) {
     }
 
     // Create the order
+    // If paymentSignature is provided, order is paid; otherwise pending
+    const status = paymentSignature ? 'paid' : 'pending';
     const result = await createOrder({
       gig_id: gigId,
       agent_id: agentId,
       client_wallet: clientWallet,
       amount_usdc: amount.toString(),
-      status: 'pending',
+      status,
       requirements_description: requirements.description,
       requirements_inputs: requirements.inputs || undefined,
       requirements_delivery_prefs: requirements.deliveryPreferences || undefined,

@@ -38,13 +38,15 @@ async function apiRequest(
 }
 
 // Order types
+import { OrderStatus } from './order-state-machine';
+
 export interface Order {
   id: string;
   gig_id: string;
   agent_id: string;
   client_wallet: string;
   amount_usdc: string;
-  status: 'pending' | 'in_progress' | 'delivered' | 'completed' | 'cancelled';
+  status: OrderStatus;
   requirements_description: string;
   requirements_inputs?: string;
   requirements_delivery_prefs?: string;
@@ -109,7 +111,7 @@ export async function getOrdersByAgent(agentId: string): Promise<Order[]> {
   return [];
 }
 
-export async function updateOrderStatus(id: string, status: Order['status']): Promise<boolean> {
+export async function updateOrderStatus(id: string, status: OrderStatus): Promise<boolean> {
   const result = await apiRequest('orders', {
     method: 'PUT',
     id,
@@ -171,12 +173,41 @@ export async function getGig(id: string): Promise<{ id: string; title: string; d
   return null;
 }
 
+// Agent type with all fields
+export interface Agent {
+  id: string;
+  name: string;
+  display_name: string;
+  bio: string;
+  avatar_url: string;
+  skills: string;
+  hourly_rate_usdc: string;
+  rating: string;
+  total_jobs: string;
+  is_verified: boolean;
+  is_featured: boolean;
+  wallet_address: string;
+  webhook_url?: string; // Optional webhook URL for order notifications
+  created_at: string;
+  updated_at: string;
+}
+
 // Agent info helper
-export async function getAgent(id: string): Promise<{ id: string; name: string; display_name: string; avatar_url: string } | null> {
+export async function getAgent(id: string): Promise<Agent | null> {
   const result = await apiRequest('agents', { where: `id:eq:${id}` });
   if (result.ok && result.data) {
-    const data = result.data as { data?: { id: string; name: string; display_name: string; avatar_url: string }[] };
+    const data = result.data as { data?: Agent[] };
     return data.data?.[0] || null;
   }
   return null;
+}
+
+// Update agent profile (including webhook_url)
+export async function updateAgent(id: string, updates: Partial<Omit<Agent, 'id' | 'created_at'>>): Promise<boolean> {
+  const result = await apiRequest('agents', {
+    method: 'PUT',
+    id,
+    data: { ...updates, updated_at: new Date().toISOString() },
+  });
+  return result.ok;
 }

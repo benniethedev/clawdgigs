@@ -35,10 +35,13 @@ export default async function OrderDetailPage({ params }: PageProps) {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'pending': return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30';
+      case 'paid': return 'bg-green-500/20 text-green-400 border-green-500/30';
       case 'in_progress': return 'bg-blue-500/20 text-blue-400 border-blue-500/30';
       case 'delivered': return 'bg-green-500/20 text-green-400 border-green-500/30';
+      case 'revision_requested': return 'bg-orange-500/20 text-orange-400 border-orange-500/30';
       case 'completed': return 'bg-green-500/20 text-green-300 border-green-500/30';
-      case 'cancelled': return 'bg-red-500/20 text-red-400 border-red-500/30';
+      case 'disputed': return 'bg-red-500/20 text-red-400 border-red-500/30';
+      case 'cancelled': return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
       default: return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
     }
   };
@@ -46,11 +49,28 @@ export default async function OrderDetailPage({ params }: PageProps) {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'pending': return '⏳';
+      case 'paid': return '💳';
       case 'in_progress': return '⚙️';
       case 'delivered': return '📦';
+      case 'revision_requested': return '🔄';
       case 'completed': return '✅';
+      case 'disputed': return '⚠️';
       case 'cancelled': return '❌';
       default: return '❓';
+    }
+  };
+
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'pending': return 'Pending Payment';
+      case 'paid': return 'Paid - Awaiting Start';
+      case 'in_progress': return 'In Progress';
+      case 'delivered': return 'Delivered';
+      case 'revision_requested': return 'Revision Requested';
+      case 'completed': return 'Completed';
+      case 'disputed': return 'Disputed';
+      case 'cancelled': return 'Cancelled';
+      default: return status.replace('_', ' ');
     }
   };
 
@@ -90,7 +110,7 @@ export default async function OrderDetailPage({ params }: PageProps) {
               <div className="flex items-center gap-3 mb-2">
                 <h1 className="text-2xl font-bold text-white">Order #{id.slice(0, 8)}</h1>
                 <span className={`px-3 py-1 rounded-full text-sm font-medium border ${getStatusColor(order.status)}`}>
-                  {getStatusIcon(order.status)} {order.status.replace('_', ' ')}
+                  {getStatusIcon(order.status)} {getStatusLabel(order.status)}
                 </span>
               </div>
               <p className="text-gray-400">
@@ -183,13 +203,28 @@ export default async function OrderDetailPage({ params }: PageProps) {
           </div>
         ) : (
           <div className="bg-gray-800 rounded-2xl p-8 border border-gray-700 text-center mb-6">
-            <div className="w-16 h-16 bg-yellow-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-              <span className="text-3xl">⏳</span>
+            <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${
+              order.status === 'disputed' ? 'bg-red-500/20' : 
+              order.status === 'revision_requested' ? 'bg-orange-500/20' :
+              order.status === 'cancelled' ? 'bg-gray-500/20' :
+              'bg-yellow-500/20'
+            }`}>
+              <span className="text-3xl">{getStatusIcon(order.status)}</span>
             </div>
-            <h2 className="text-xl font-bold text-white mb-2">Awaiting Delivery</h2>
+            <h2 className="text-xl font-bold text-white mb-2">
+              {order.status === 'pending' && "Awaiting Payment"}
+              {order.status === 'paid' && "Payment Received"}
+              {order.status === 'in_progress' && "Work In Progress"}
+              {order.status === 'revision_requested' && "Revision In Progress"}
+              {order.status === 'disputed' && "Order Disputed"}
+              {order.status === 'cancelled' && "Order Cancelled"}
+            </h2>
             <p className="text-gray-400">
-              {order.status === 'pending' && "The agent will start working on your order soon."}
+              {order.status === 'pending' && "Complete payment to start your order."}
+              {order.status === 'paid' && "The agent will start working on your order soon."}
               {order.status === 'in_progress' && "The agent is currently working on your order."}
+              {order.status === 'revision_requested' && "The agent is working on your requested changes."}
+              {order.status === 'disputed' && "This order is under review. Our team will contact you."}
               {order.status === 'cancelled' && "This order has been cancelled."}
             </p>
           </div>

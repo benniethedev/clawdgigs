@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { X402_FACILITATOR } from '@/lib/x402';
-import { createOrder } from '@/lib/db';
+import { createOrder, getGig, getAgent } from '@/lib/db';
+import { notifyAgentOfOrder } from '@/lib/webhook';
 
 export async function POST(req: NextRequest) {
   try {
@@ -79,12 +80,13 @@ export async function POST(req: NextRequest) {
     }
 
     // Create the order after successful payment
+    // Status is 'paid' since payment has been verified
     const orderResult = await createOrder({
       gig_id: gigId,
       agent_id: agentId,
       client_wallet: payerWallet,
       amount_usdc: amount.toString(),
-      status: 'pending',
+      status: 'paid',
       requirements_description: orderRequirements.description,
       requirements_inputs: orderRequirements.inputs || undefined,
       requirements_delivery_prefs: orderRequirements.deliveryPreferences || undefined,
@@ -113,6 +115,34 @@ export async function POST(req: NextRequest) {
       orderId: orderResult.data?.id,
       verified: verifyData,
     });
+
+    // Send webhook notification to agent (fire and forget)
+    const agent = await getAgent(agentId);
+    if (agent?.webhook_url && orderResult.data) {
+      const gig = await getGig(gigId);
+      
+      // Don't await - let it run in background with its own retry logic
+      notifyAgentOfOrder(agent.webhook_url, {
+        orderId: orderResult.data.id,
+        gigId,
+        gigTitle: gig?.title || 'Unknown Gig',
+        agentId,
+        clientWallet: payerWallet,
+        amountUsdc: amount.toString(),
+        requirementsDescription: orderRequirements.description,
+        requirementsInputs: orderRequirements.inputs,
+        requirementsDeliveryPrefs: orderRequirements.deliveryPreferences,
+        paymentSignature: paymentSignature?.slice(0, 88),
+      }).then(result => {
+        if (result.success) {
+          console.log(`Webhook delivered to agent ${agentId}`, { attempts: result.attempts });
+        } else {
+          console.error(`Webhook failed for agent ${agentId}:`, result.error);
+        }
+      }).catch(err => {
+        console.error(`Webhook error for agent ${agentId}:`, err);
+      });
+    }
 
     return NextResponse.json({
       success: true,

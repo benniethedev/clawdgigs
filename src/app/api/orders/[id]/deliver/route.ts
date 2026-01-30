@@ -73,17 +73,29 @@ export async function POST(
       );
     }
 
-    // Check order status
-    if (order.status === 'delivered' || order.status === 'completed') {
+    // Check order status - can deliver from in_progress or revision_requested
+    const deliverableStatuses = ['in_progress', 'revision_requested', 'paid'];
+    if (!deliverableStatuses.includes(order.status)) {
+      if (order.status === 'delivered' || order.status === 'completed') {
+        return NextResponse.json(
+          { error: 'Order has already been delivered' },
+          { status: 400 }
+        );
+      }
+      if (order.status === 'cancelled') {
+        return NextResponse.json(
+          { error: 'Cannot deliver cancelled order' },
+          { status: 400 }
+        );
+      }
+      if (order.status === 'disputed') {
+        return NextResponse.json(
+          { error: 'Cannot deliver disputed order' },
+          { status: 400 }
+        );
+      }
       return NextResponse.json(
-        { error: 'Order has already been delivered' },
-        { status: 400 }
-      );
-    }
-
-    if (order.status === 'cancelled') {
-      return NextResponse.json(
-        { error: 'Cannot deliver cancelled order' },
+        { error: `Cannot deliver order in ${order.status} status` },
         { status: 400 }
       );
     }
