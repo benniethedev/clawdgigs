@@ -381,8 +381,8 @@ export function PaymentModal({
                 </div>
 
                 {/* Info */}
-                <p className="text-gray-500 text-xs text-center mt-4">
-                  🔒 Secured by SolPay Escrow • Auto-release in 7 days
+                <p className="text-gray-500 text-xs text-center mt-4 flex items-center justify-center gap-1">
+                  <Lock className="w-3 h-3" /> Secured by SolPay Escrow • Auto-release in 7 days
                 </p>
               </>
             )}
