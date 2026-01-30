@@ -1,17 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrder, updateOrderStatus } from '@/lib/db';
-import { resolveDispute, getEscrow } from '@/lib/escrow';
+import { getEscrow, releaseEscrow, refundEscrow, formatEscrowAmount, getPlatformWallet } from '@/lib/escrow';
 
 /**
  * POST /api/escrow/[id]/resolve
  * 
- * Resolve a disputed escrow (AI resolution or admin)
+ * Resolve a disputed escrow (admin resolution)
  * 
  * Body:
- * - disputeId: string (the dispute ID from the escrow service)
- * - resolution: 'refund_buyer' | 'pay_seller' | 'split' | 'other'
+ * - resolution: 'refund_buyer' | 'pay_seller'
  * - notes: string (explanation)
- * - resolvedBy?: string (default: 'ai')
+ * - resolvedBy?: string (admin identifier)
  */
 export async function POST(
   req: NextRequest,
@@ -20,12 +19,12 @@ export async function POST(
   try {
     const { id: escrowId } = await params;
     const body = await req.json();
-    const { disputeId, resolution, notes, resolvedBy = 'ai' } = body;
+    const { resolution, notes, resolvedBy = 'admin' } = body;
 
     // Validate required fields
-    if (!resolution || !['refund_buyer', 'pay_seller', 'split', 'other'].includes(resolution)) {
+    if (!resolution || !['refund_buyer', 'pay_seller'].includes(resolution)) {
       return NextResponse.json(
-        { error: 'Invalid resolution. Must be: refund_buyer, pay_seller, split, or other' },
+        { error: 'Invalid resolution. Must be: refund_buyer or pay_seller' },
         { status: 400 }
       );
     }
@@ -33,13 +32,6 @@ export async function POST(
     if (!notes) {
       return NextResponse.json(
         { error: 'Missing resolution notes' },
-        { status: 400 }
-      );
-    }
-
-    if (!disputeId) {
-      return NextResponse.json(
-        { error: 'Missing disputeId' },
         { status: 400 }
       );
     }
@@ -60,14 +52,13 @@ export async function POST(
       );
     }
 
-    // Resolve the dispute through the escrow API
-    const result = await resolveDispute(
-      escrowId,
-      disputeId,
-      resolution,
-      notes,
-      resolvedBy
-    );
+    // Resolve based on decision
+    let result;
+    if (resolution === 'pay_seller') {
+      result = await releaseEscrow(escrowId);
+    } else {
+      result = await refundEscrow(escrowId);
+    }
 
     if (!result.ok) {
       return NextResponse.json(
@@ -76,25 +67,25 @@ export async function POST(
       );
     }
 
-    // Update the order status based on resolution
-    // Find order by partner_order_id from escrow metadata
-    const orderId = escrow.partner_order_id || (escrow.metadata?.order_id as string);
-    
-    if (orderId) {
-      const order = await getOrder(orderId);
+    // Update the order status
+    if (escrow.order_id) {
+      const order = await getOrder(escrow.order_id);
       if (order) {
-        // If paid to seller -> completed, if refunded -> cancelled
         const newOrderStatus = resolution === 'pay_seller' ? 'completed' : 'cancelled';
-        await updateOrderStatus(orderId, newOrderStatus);
+        await updateOrderStatus(escrow.order_id, newOrderStatus);
       }
     }
 
     console.log('Escrow dispute resolved:', {
       escrowId,
-      disputeId,
+      orderId: escrow.order_id,
       resolution,
       resolvedBy,
       notes,
+      amount: formatEscrowAmount(escrow.amount),
+      outcome: resolution === 'pay_seller' 
+        ? `Seller receives ${formatEscrowAmount(escrow.seller_amount)}, platform receives ${formatEscrowAmount(escrow.platform_fee)}`
+        : `Buyer refunded ${formatEscrowAmount(escrow.amount)}`,
     });
 
     return NextResponse.json({
@@ -103,6 +94,18 @@ export async function POST(
       escrowId,
       resolution,
       resolvedBy,
+      escrow: result.escrow,
+      payout: resolution === 'pay_seller' 
+        ? {
+            sellerWallet: escrow.seller_wallet,
+            sellerAmount: escrow.seller_amount,
+            platformFee: escrow.platform_fee,
+            platformWallet: getPlatformWallet(),
+          }
+        : {
+            buyerWallet: escrow.buyer_wallet,
+            refundAmount: escrow.amount,
+          },
     });
   } catch (error) {
     console.error('Escrow resolution error:', error);

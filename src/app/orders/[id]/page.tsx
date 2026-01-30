@@ -193,11 +193,11 @@ export default async function OrderDetailPage({ params }: PageProps) {
                     </div>
                   </div>
                 )}
-                {escrow.status === 'released' && escrow.completed_at && (
+                {escrow.status === 'released' && escrow.released_at && (
                   <div className="text-right">
                     <div className="text-gray-400 text-sm">Released</div>
                     <div className="text-green-400 text-sm font-medium">
-                      {new Date(escrow.completed_at).toLocaleDateString('en-US', {
+                      {new Date(escrow.released_at).toLocaleDateString('en-US', {
                         month: 'short',
                         day: 'numeric',
                         year: 'numeric',

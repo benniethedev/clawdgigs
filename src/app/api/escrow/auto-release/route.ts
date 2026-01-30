@@ -1,18 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getEscrowsForAutoRelease, releaseEscrow, formatEscrowAmount, getPlatformWallet } from '@/lib/escrow';
 import { updateOrderStatus } from '@/lib/db';
 
 /**
  * POST /api/escrow/auto-release
  * 
- * Note: Auto-release is now handled by the api.solpay.cash escrow service.
- * This endpoint is kept for backward compatibility and manual checks.
- * 
- * The escrow service automatically releases funds when:
- * 1. All required proof checks pass
- * 2. The time_lock proof check expires (7 days by default)
- * 
- * This endpoint can be used to manually trigger a check or
- * to sync order statuses after auto-release.
+ * Process auto-release for escrows past their 7-day window
+ * Should be called by a cron job
  * 
  * Headers:
  * - X-Cron-Secret: shared secret to authenticate cron calls
@@ -31,15 +25,92 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Auto-release is now handled by api.solpay.cash
-    // This endpoint is a no-op but kept for compatibility
-    console.log('Auto-release check: Handled by api.solpay.cash escrow service');
+    // Get all escrows due for auto-release
+    const escrowsToRelease = await getEscrowsForAutoRelease();
+    
+    if (escrowsToRelease.length === 0) {
+      return NextResponse.json({
+        success: true,
+        message: 'No escrows due for auto-release',
+        processed: 0,
+      });
+    }
+
+    const results: Array<{
+      escrowId: string;
+      orderId: string;
+      sellerWallet: string;
+      amount: string;
+      success: boolean;
+      error?: string;
+    }> = [];
+
+    // Process each escrow
+    for (const escrow of escrowsToRelease) {
+      try {
+        // Release the escrow
+        const releaseResult = await releaseEscrow(escrow.id, undefined);
+        
+        if (releaseResult.ok) {
+          // Update order status
+          if (escrow.order_id) {
+            await updateOrderStatus(escrow.order_id, 'completed');
+          }
+          
+          results.push({
+            escrowId: escrow.id,
+            orderId: escrow.order_id,
+            sellerWallet: escrow.seller_wallet,
+            amount: formatEscrowAmount(escrow.seller_amount),
+            success: true,
+          });
+          
+          console.log('Auto-released escrow:', {
+            escrowId: escrow.id,
+            orderId: escrow.order_id,
+            sellerWallet: escrow.seller_wallet,
+            sellerAmount: formatEscrowAmount(escrow.seller_amount),
+            platformFee: formatEscrowAmount(escrow.platform_fee),
+            platformWallet: getPlatformWallet(),
+          });
+        } else {
+          results.push({
+            escrowId: escrow.id,
+            orderId: escrow.order_id,
+            sellerWallet: escrow.seller_wallet,
+            amount: formatEscrowAmount(escrow.seller_amount),
+            success: false,
+            error: releaseResult.error,
+          });
+        }
+      } catch (error) {
+        results.push({
+          escrowId: escrow.id,
+          orderId: escrow.order_id,
+          sellerWallet: escrow.seller_wallet,
+          amount: formatEscrowAmount(escrow.seller_amount),
+          success: false,
+          error: String(error),
+        });
+      }
+    }
+
+    const successCount = results.filter(r => r.success).length;
+    const failCount = results.filter(r => !r.success).length;
+
+    console.log('Auto-release batch complete:', {
+      total: escrowsToRelease.length,
+      success: successCount,
+      failed: failCount,
+    });
 
     return NextResponse.json({
       success: true,
-      message: 'Auto-release is handled by the escrow service (api.solpay.cash)',
-      note: 'Escrow funds are automatically released after 7 days if not disputed',
-      processed: 0,
+      message: `Auto-released ${successCount} escrow(s)`,
+      processed: escrowsToRelease.length,
+      successCount,
+      failCount,
+      results,
     });
   } catch (error) {
     console.error('Auto-release check error:', error);

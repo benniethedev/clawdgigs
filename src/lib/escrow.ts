@@ -1,11 +1,15 @@
-// SolPay Escrow Client
-// Uses api.solpay.cash for real escrow protection
+// Custom Escrow System for ClawdGigs
+// Uses PressBase for storage, handles all escrow logic internally
 
-const ESCROW_API_BASE = process.env.ESCROW_API_URL || 'https://api.solpay.cash';
-const PLATFORM_ID = 'clawdgigs';
+const API_BASE = 'https://backend.benbond.dev/wp-json/app/v1/db';
+
+// Platform fee configuration
+const PLATFORM_FEE_PERCENT = 10; // 10% platform fee
+const PLATFORM_WALLET = '2BcjnU1sSv2f4Uk793ZY59U41LapKMggYmwhiPDrhHfs'; // 0xRob wallet
 
 // Auto-release after 7 days (in milliseconds)
 const AUTO_RELEASE_DAYS = 7;
+const AUTO_RELEASE_MS = AUTO_RELEASE_DAYS * 24 * 60 * 60 * 1000;
 
 export type EscrowStatus = 
   | 'pending_funding'  // Escrow created, awaiting payment
@@ -13,85 +17,72 @@ export type EscrowStatus =
   | 'released'         // Funds released to agent
   | 'disputed'         // Client raised dispute
   | 'refunded'         // Funds refunded to client
-  | 'cancelled'        // Escrow cancelled
-  | 'expired';         // Escrow expired
-
-export type DealType = 'digital_goods' | 'service' | 'physical_shipment' | 'other';
+  | 'cancelled';       // Escrow cancelled
 
 export interface Escrow {
   id: string;
-  escrow_id: string; // Human-readable ID like ESC-ABC123
   buyer_wallet: string;
   seller_wallet: string;
-  escrow_wallet: string | null;
-  token: string;
-  amount: number; // In micro units (6 decimals for USDC)
-  fee_percentage: number;
-  fee_amount: number;
-  deal_type: DealType;
-  deal_description: string | null;
+  amount: number;              // Amount in micro USDC (6 decimals)
+  platform_fee: number;        // Platform fee in micro USDC
+  seller_amount: number;       // Amount seller receives (amount - platform_fee)
   status: EscrowStatus;
+  order_id: string;            // Link to order
+  description: string;
   funding_tx_signature: string | null;
-  payout_tx_signature: string | null;
+  release_tx_signature: string | null;
   funded_at: string | null;
-  completed_at: string | null;
+  released_at: string | null;
+  disputed_at: string | null;
+  dispute_reason: string | null;
   auto_release_at: string | null;
-  partner_id: string | null;
-  partner_order_id: string | null;
-  metadata: Record<string, unknown>;
   created_at: string;
   updated_at: string;
 }
 
-export interface Dispute {
-  id: string;
-  escrow_id: string;
-  opened_by: string;
-  reason: string;
-  description: string | null;
-  status: 'open' | 'under_review' | 'resolved' | 'escalated';
-  resolution: string | null;
-  resolution_notes: string | null;
-  resolved_by: string | null;
-  resolved_at: string | null;
-  ai_assessment: string | null;
-  ai_recommended_outcome: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-// Generic API request to escrow service
-async function escrowRequest<T>(
-  endpoint: string,
+// API helper
+async function escrowDbRequest(
   options: {
     method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
-    body?: Record<string, unknown>;
+    where?: string;
+    id?: string;
+    data?: Record<string, unknown>;
   } = {}
-): Promise<{ ok: boolean; data?: T; error?: string }> {
-  const { method = 'GET', body } = options;
+): Promise<{ ok: boolean; data?: unknown; error?: string }> {
+  const { method = 'GET', where, id, data } = options;
   
-  const url = `${ESCROW_API_BASE}${endpoint}`;
+  let url = `${API_BASE}/escrows`;
+  if (id) url += `/${id}`;
+  if (where && method === 'GET') url += `?where=${encodeURIComponent(where)}`;
+
+  const headers: HeadersInit = {
+    'Authorization': `Bearer ${process.env.PRESSBASE_SERVICE_KEY}`,
+    'Content-Type': 'application/json',
+  };
 
   try {
     const res = await fetch(url, {
       method,
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: body ? JSON.stringify(body) : undefined,
+      headers,
+      body: data ? JSON.stringify(data) : undefined,
       cache: 'no-store',
     });
 
     const json = await res.json();
-    
-    if (!res.ok) {
-      return { ok: false, error: json.error || json.message || `HTTP ${res.status}` };
-    }
-    
-    return { ok: true, data: json };
+    return json;
   } catch (error) {
     return { ok: false, error: String(error) };
   }
+}
+
+// Generate a short readable ID
+function generateEscrowId(): string {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let id = 'ESC-';
+  for (let i = 0; i < 8; i++) {
+    id += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return id;
 }
 
 // Create a new escrow for an order
@@ -104,144 +95,224 @@ export async function createEscrow(params: {
 }): Promise<{ ok: boolean; data?: Escrow; error?: string }> {
   // Convert USDC amount to micro units (6 decimals)
   const amountMicro = Math.round(parseFloat(params.amountUsdc) * 1_000_000);
+  
+  // Calculate platform fee (10%)
+  const platformFee = Math.round(amountMicro * PLATFORM_FEE_PERCENT / 100);
+  const sellerAmount = amountMicro - platformFee;
 
-  const result = await escrowRequest<{ success: boolean; escrow: Escrow }>('/api/v1/escrow', {
+  const now = new Date().toISOString();
+  
+  const escrowData = {
+    id: generateEscrowId(),
+    buyer_wallet: params.clientWallet,
+    seller_wallet: params.agentWallet,
+    amount: amountMicro,
+    platform_fee: platformFee,
+    seller_amount: sellerAmount,
+    status: 'pending_funding' as EscrowStatus,
+    order_id: params.orderId,
+    description: params.description || `ClawdGigs Order ${params.orderId}`,
+    funding_tx_signature: null,
+    release_tx_signature: null,
+    funded_at: null,
+    released_at: null,
+    disputed_at: null,
+    dispute_reason: null,
+    auto_release_at: null,
+    created_at: now,
+    updated_at: now,
+  };
+
+  const result = await escrowDbRequest({
     method: 'POST',
-    body: {
-      buyer_wallet: params.clientWallet,
-      seller_wallet: params.agentWallet,
-      token: 'USDC',
-      amount: amountMicro,
-      deal_type: 'service' as DealType,
-      deal_description: params.description || `ClawdGigs Order ${params.orderId}`,
-      partner_id: PLATFORM_ID,
-      partner_order_id: params.orderId,
-      metadata: {
-        platform: PLATFORM_ID,
-        order_id: params.orderId,
-      },
-      // Add auto-release proof check (7 days)
-      proof_checks: [
-        {
-          type: 'time_lock',
-          name: 'Auto-release after 7 days',
-          required: false,
-          config: {
-            auto_release_days: AUTO_RELEASE_DAYS,
-          },
-        },
-      ],
-    },
+    data: escrowData,
   });
 
-  if (result.ok && result.data?.escrow) {
-    return { ok: true, data: result.data.escrow };
+  if (result.ok && result.data) {
+    return { ok: true, data: result.data as Escrow };
   }
   return { ok: false, error: result.error || 'Failed to create escrow' };
 }
 
-// Get escrow by ID with full details
+// Get escrow by ID
 export async function getEscrow(escrowId: string): Promise<Escrow | null> {
-  const result = await escrowRequest<{ success: boolean; escrow: Escrow }>(`/api/v1/escrow/${escrowId}`);
-  
-  if (result.ok && result.data?.escrow) {
-    return result.data.escrow;
+  const result = await escrowDbRequest({ where: `id:eq:${escrowId}` });
+  if (result.ok && result.data) {
+    const data = result.data as { data?: Escrow[] };
+    return data.data?.[0] || null;
   }
   return null;
 }
 
-// Get escrow by order ID (using partner_order_id)
+// Get escrow by order ID
 export async function getEscrowByOrder(orderId: string): Promise<Escrow | null> {
-  // The API may support filtering by partner_order_id, or we may need to list and filter
-  // For now, we'll store the escrow_id in the order record and use getEscrow
-  // This function is kept for backward compatibility
-  console.warn('getEscrowByOrder: Use order.escrow_id with getEscrow() instead');
+  const result = await escrowDbRequest({ where: `order_id:eq:${orderId}` });
+  if (result.ok && result.data) {
+    const data = result.data as { data?: Escrow[] };
+    return data.data?.[0] || null;
+  }
   return null;
 }
 
-// Release escrow to agent (client approves delivery)
-export async function releaseEscrow(
-  escrowId: string,
-  actorWallet?: string
-): Promise<{ ok: boolean; error?: string }> {
-  const result = await escrowRequest<{ success: boolean; escrow: Escrow }>(`/api/v1/escrow/${escrowId}/release`, {
-    method: 'POST',
-    body: {
-      actor: actorWallet,
-    },
-  });
-
-  if (result.ok && result.data?.success) {
-    return { ok: true };
+// Get all escrows due for auto-release
+export async function getEscrowsForAutoRelease(): Promise<Escrow[]> {
+  // Get all funded escrows
+  const result = await escrowDbRequest({ where: `status:eq:funded` });
+  if (result.ok && result.data) {
+    const data = result.data as { data?: Escrow[] };
+    const now = new Date();
+    // Filter to those past auto-release date
+    return (data.data || []).filter(escrow => {
+      if (!escrow.auto_release_at) return false;
+      return new Date(escrow.auto_release_at) <= now;
+    });
   }
-  return { ok: false, error: result.error || 'Failed to release escrow' };
+  return [];
 }
 
-// Create dispute on escrow
-export async function disputeEscrow(
+// Update escrow status
+async function updateEscrow(
   escrowId: string, 
-  reason: string,
-  description: string,
-  openedBy: string
-): Promise<{ ok: boolean; error?: string; dispute?: Dispute }> {
-  const result = await escrowRequest<{ success: boolean; dispute: Dispute }>(`/api/v1/escrow/${escrowId}/dispute`, {
-    method: 'POST',
-    body: {
-      reason,
-      description,
-      opened_by: openedBy,
-    },
-  });
-
-  if (result.ok && result.data?.success) {
-    return { ok: true, dispute: result.data.dispute };
-  }
-  return { ok: false, error: result.error || 'Failed to create dispute' };
-}
-
-// Resolve dispute (admin/AI only)
-export async function resolveDispute(
-  escrowId: string,
-  disputeId: string,
-  resolution: 'refund_buyer' | 'pay_seller' | 'split' | 'other',
-  notes: string,
-  resolvedBy: string = 'ai'
+  updates: Partial<Omit<Escrow, 'id' | 'created_at'>>
 ): Promise<{ ok: boolean; error?: string }> {
-  const result = await escrowRequest<{ success: boolean; dispute: Dispute }>(`/api/v1/escrow/${escrowId}/dispute`, {
+  const result = await escrowDbRequest({
     method: 'PUT',
-    body: {
-      dispute_id: disputeId,
-      resolution,
-      resolution_notes: notes,
-      resolved_by: resolvedBy,
-      use_ai_assessment: resolvedBy === 'ai',
-    },
+    id: escrowId,
+    data: { ...updates, updated_at: new Date().toISOString() },
   });
-
-  if (result.ok && result.data?.success) {
-    return { ok: true };
-  }
-  return { ok: false, error: result.error || 'Failed to resolve dispute' };
+  return { ok: result.ok, error: result.error };
 }
 
 // Mark escrow as funded (after payment verification)
 export async function markEscrowFunded(
   escrowId: string,
-  fundingTxSignature: string,
-  escrowWallet?: string
+  fundingTxSignature: string
 ): Promise<{ ok: boolean; error?: string }> {
-  const result = await escrowRequest<{ success: boolean; escrow: Escrow }>(`/api/v1/escrow/${escrowId}/fund`, {
-    method: 'POST',
-    body: {
-      funding_tx_signature: fundingTxSignature,
-      escrow_wallet: escrowWallet,
-    },
+  const escrow = await getEscrow(escrowId);
+  if (!escrow) {
+    return { ok: false, error: 'Escrow not found' };
+  }
+
+  if (escrow.status !== 'pending_funding') {
+    return { ok: false, error: `Cannot fund escrow in ${escrow.status} status` };
+  }
+
+  const now = new Date();
+  const autoReleaseAt = new Date(now.getTime() + AUTO_RELEASE_MS);
+
+  return updateEscrow(escrowId, {
+    status: 'funded',
+    funding_tx_signature: fundingTxSignature,
+    funded_at: now.toISOString(),
+    auto_release_at: autoReleaseAt.toISOString(),
+  });
+}
+
+// Release escrow to agent (client approves delivery)
+export async function releaseEscrow(
+  escrowId: string,
+  releaseTxSignature?: string
+): Promise<{ ok: boolean; escrow?: Escrow; error?: string }> {
+  const escrow = await getEscrow(escrowId);
+  if (!escrow) {
+    return { ok: false, error: 'Escrow not found' };
+  }
+
+  if (escrow.status !== 'funded') {
+    return { ok: false, error: `Cannot release escrow in ${escrow.status} status` };
+  }
+
+  const result = await updateEscrow(escrowId, {
+    status: 'released',
+    release_tx_signature: releaseTxSignature || null,
+    released_at: new Date().toISOString(),
   });
 
-  if (result.ok && result.data?.success) {
-    return { ok: true };
+  if (result.ok) {
+    const updatedEscrow = await getEscrow(escrowId);
+    return { ok: true, escrow: updatedEscrow || undefined };
   }
-  return { ok: false, error: result.error || 'Failed to mark escrow as funded' };
+  return { ok: false, error: result.error };
+}
+
+// Refund escrow to buyer
+export async function refundEscrow(
+  escrowId: string,
+  refundTxSignature?: string
+): Promise<{ ok: boolean; escrow?: Escrow; error?: string }> {
+  const escrow = await getEscrow(escrowId);
+  if (!escrow) {
+    return { ok: false, error: 'Escrow not found' };
+  }
+
+  // Can refund from funded or disputed status
+  if (escrow.status !== 'funded' && escrow.status !== 'disputed') {
+    return { ok: false, error: `Cannot refund escrow in ${escrow.status} status` };
+  }
+
+  const result = await updateEscrow(escrowId, {
+    status: 'refunded',
+    release_tx_signature: refundTxSignature || null,
+    released_at: new Date().toISOString(),
+  });
+
+  if (result.ok) {
+    const updatedEscrow = await getEscrow(escrowId);
+    return { ok: true, escrow: updatedEscrow || undefined };
+  }
+  return { ok: false, error: result.error };
+}
+
+// Create dispute on escrow
+export async function disputeEscrow(
+  escrowId: string, 
+  reason: string
+): Promise<{ ok: boolean; escrow?: Escrow; error?: string }> {
+  const escrow = await getEscrow(escrowId);
+  if (!escrow) {
+    return { ok: false, error: 'Escrow not found' };
+  }
+
+  if (escrow.status !== 'funded') {
+    return { ok: false, error: `Cannot dispute escrow in ${escrow.status} status` };
+  }
+
+  const result = await updateEscrow(escrowId, {
+    status: 'disputed',
+    dispute_reason: reason,
+    disputed_at: new Date().toISOString(),
+    auto_release_at: null, // Stop auto-release timer when disputed
+  });
+
+  if (result.ok) {
+    const updatedEscrow = await getEscrow(escrowId);
+    return { ok: true, escrow: updatedEscrow || undefined };
+  }
+  return { ok: false, error: result.error };
+}
+
+// Cancel escrow (only if pending_funding)
+export async function cancelEscrow(escrowId: string): Promise<{ ok: boolean; error?: string }> {
+  const escrow = await getEscrow(escrowId);
+  if (!escrow) {
+    return { ok: false, error: 'Escrow not found' };
+  }
+
+  if (escrow.status !== 'pending_funding') {
+    return { ok: false, error: `Cannot cancel escrow in ${escrow.status} status` };
+  }
+
+  return updateEscrow(escrowId, { status: 'cancelled' });
+}
+
+// Get platform wallet address
+export function getPlatformWallet(): string {
+  return PLATFORM_WALLET;
+}
+
+// Get platform fee percentage
+export function getPlatformFeePercent(): number {
+  return PLATFORM_FEE_PERCENT;
 }
 
 // Icon names that map to Lucide React icons
@@ -290,12 +361,6 @@ export function getEscrowStatusInfo(escrow: Escrow): {
       icon: 'XCircle',
       color: 'text-gray-400',
       description: 'Escrow was cancelled',
-    },
-    expired: {
-      label: 'Expired',
-      icon: 'Clock',
-      color: 'text-gray-400',
-      description: 'Escrow has expired',
     },
   };
 

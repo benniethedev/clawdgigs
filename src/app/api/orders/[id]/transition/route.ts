@@ -93,7 +93,7 @@ export async function POST(
     
     if (result.newStatus === 'completed' && order.escrow_id) {
       // Release escrow when order is accepted/completed
-      const escrowResult = await releaseEscrow(order.escrow_id, order.client_wallet);
+      const escrowResult = await releaseEscrow(order.escrow_id);
       if (escrowResult.ok) {
         escrowAction = 'released';
         console.log('Escrow released:', order.escrow_id);
@@ -106,12 +106,7 @@ export async function POST(
     if (result.newStatus === 'disputed' && order.escrow_id) {
       // Dispute escrow when order is disputed
       const disputeReason = reason || 'Client raised dispute';
-      const escrowResult = await disputeEscrow(
-        order.escrow_id, 
-        disputeReason,
-        `Dispute for order ${orderId}`,
-        order.client_wallet
-      );
+      const escrowResult = await disputeEscrow(order.escrow_id, disputeReason);
       if (escrowResult.ok) {
         escrowAction = 'disputed';
         console.log('Escrow disputed:', order.escrow_id);
