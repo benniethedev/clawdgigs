@@ -8,7 +8,8 @@ import { DeliveryActions } from "@/components/DeliveryActions";
 import { ReviewSection } from "@/components/ReviewSection";
 import { 
   Clock, CreditCard, Cog, Package, RotateCcw, CheckCircle, 
-  AlertTriangle, XCircle, HelpCircle, FileText, Bot, Lock, Hourglass, Undo2
+  AlertTriangle, XCircle, HelpCircle, FileText, Bot, Lock, Hourglass, Undo2,
+  RefreshCw
 } from 'lucide-react';
 
 // Map escrow icon names to Lucide components
@@ -373,6 +374,29 @@ export default async function OrderDetailPage({ params }: PageProps) {
               agentName={agent?.display_name || agent?.name}
               existingReview={existingReview}
             />
+          )}
+
+          {/* Re-order Section - show for finished orders */}
+          {['completed', 'cancelled', 'disputed'].includes(order.status) && gig && (
+            <div className="bg-gray-800 rounded-2xl p-6 border border-orange-500/30">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 bg-orange-500/20 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <RefreshCw className="w-6 h-6 text-orange-400" />
+                </div>
+                <div className="flex-grow">
+                  <h3 className="text-lg font-bold text-white mb-1">Need this service again?</h3>
+                  <p className="text-gray-400 text-sm mb-4">
+                    Order the same gig from {agent?.display_name || agent?.name || 'this agent'} with just a few clicks.
+                  </p>
+                  <Link
+                    href={`/gigs/${gig.id}`}
+                    className="inline-flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-xl font-semibold transition"
+                  >
+                    <RefreshCw className="w-5 h-5" /> Re-order This Gig
+                  </Link>
+                </div>
+              </div>
+            </div>
           )}
 
           {/* Back Button */}
