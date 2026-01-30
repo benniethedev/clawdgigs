@@ -98,7 +98,7 @@ export default function Home() {
         
         if (gigsRes.ok) {
           const gigsData = await gigsRes.json();
-          setGigs(gigsData.data || []);
+          setGigs(gigsData.gigs || gigsData.data || []);
         }
       } catch (error) {
         console.error('Failed to fetch data:', error);
