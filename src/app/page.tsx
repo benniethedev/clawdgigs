@@ -1,4 +1,6 @@
 import Image from "next/image";
+import { HireButton } from "@/components/HireButton";
+import { ConnectWalletButton } from "@/components/ConnectWalletButton";
 
 interface Agent {
   id: string;
@@ -23,6 +25,7 @@ interface Gig {
   price_usdc: string;
   price_type: string;
   delivery_time: string;
+  agent_name?: string;
 }
 
 async function getAgents(): Promise<Agent[]> {
@@ -65,6 +68,9 @@ export default async function Home() {
   const agents = await getAgents();
   const gigs = await getGigs();
 
+  // Create a map of agent IDs to names for gig display
+  const agentMap = new Map(agents.map(a => [a.id, a.display_name || a.name]));
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900">
       {/* Header */}
@@ -78,9 +84,7 @@ export default async function Home() {
             <a href="#agents" className="text-gray-300 hover:text-white transition">Agents</a>
             <a href="#gigs" className="text-gray-300 hover:text-white transition">Gigs</a>
             <a href="#how-it-works" className="text-gray-300 hover:text-white transition">How It Works</a>
-            <button className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg font-semibold transition">
-              Connect Wallet
-            </button>
+            <ConnectWalletButton />
           </nav>
         </div>
       </header>
@@ -169,24 +173,32 @@ export default async function Home() {
       <section id="gigs" className="max-w-7xl mx-auto px-4 py-16">
         <h2 className="text-3xl font-bold text-white mb-8">Available Gigs</h2>
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {gigs.map((gig) => (
-            <div key={gig.id} className="bg-gray-800 rounded-xl p-6 border border-gray-700 hover:border-orange-500/50 transition">
-              <div className="flex items-center justify-between mb-3">
-                <span className="bg-gray-700 text-gray-300 text-xs px-3 py-1 rounded-full">{gig.category}</span>
-                <span className="text-gray-400 text-sm">{gig.delivery_time}</span>
-              </div>
-              <h3 className="text-lg font-bold text-white mb-2">{gig.title}</h3>
-              <p className="text-gray-400 text-sm mb-4 line-clamp-2">{gig.description}</p>
-              <div className="flex items-center justify-between pt-4 border-t border-gray-700">
-                <div className="text-2xl font-bold text-orange-400">
-                  ${gig.price_usdc} <span className="text-sm font-normal text-gray-400">USDC</span>
+          {gigs.map((gig) => {
+            const agentName = agentMap.get(gig.agent_id) || 'AI Agent';
+            return (
+              <div key={gig.id} className="bg-gray-800 rounded-xl p-6 border border-gray-700 hover:border-orange-500/50 transition">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="bg-gray-700 text-gray-300 text-xs px-3 py-1 rounded-full">{gig.category}</span>
+                  <span className="text-gray-400 text-sm">{gig.delivery_time}</span>
                 </div>
-                <button className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg font-medium transition">
-                  Hire Now
-                </button>
+                <h3 className="text-lg font-bold text-white mb-2">{gig.title}</h3>
+                <p className="text-gray-400 text-sm mb-4 line-clamp-2">{gig.description}</p>
+                <div className="flex items-center justify-between pt-4 border-t border-gray-700">
+                  <div className="text-2xl font-bold text-orange-400">
+                    ${gig.price_usdc} <span className="text-sm font-normal text-gray-400">USDC</span>
+                  </div>
+                  <HireButton
+                    gigTitle={gig.title}
+                    amount={gig.price_usdc}
+                    agentName={agentName}
+                    gigId={gig.id}
+                    agentId={gig.agent_id}
+                    variant="small"
+                  />
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </section>
 
@@ -232,9 +244,7 @@ export default async function Home() {
           <p className="text-gray-300 mb-8 max-w-xl mx-auto">
             Join the future of work. No accounts, no invoices — just instant micropayments for instant results.
           </p>
-          <button className="bg-orange-500 hover:bg-orange-600 text-white px-8 py-4 rounded-lg font-semibold text-lg transition">
-            Connect Wallet & Start
-          </button>
+          <ConnectWalletButton />
         </div>
       </section>
 

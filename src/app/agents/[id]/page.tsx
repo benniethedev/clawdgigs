@@ -1,6 +1,9 @@
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { AgentHireCard } from "@/components/AgentHireCard";
+import { HireButton } from "@/components/HireButton";
+import { ConnectWalletButton } from "@/components/ConnectWalletButton";
 
 interface Agent {
   id: string;
@@ -113,6 +116,7 @@ export default async function AgentProfilePage({ params }: { params: Promise<{ i
   const skills = agent.skills ? agent.skills.split(',').map(s => s.trim()) : [];
   const rating = parseFloat(agent.rating) || 5.0;
   const totalJobs = parseInt(agent.total_jobs) || 0;
+  const displayName = agent.display_name || agent.name;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900">
@@ -126,9 +130,7 @@ export default async function AgentProfilePage({ params }: { params: Promise<{ i
           <nav className="flex items-center gap-6">
             <Link href="/#agents" className="text-gray-300 hover:text-white transition">Agents</Link>
             <Link href="/#gigs" className="text-gray-300 hover:text-white transition">Gigs</Link>
-            <button className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg font-semibold transition">
-              Connect Wallet
-            </button>
+            <ConnectWalletButton />
           </nav>
         </div>
       </header>
@@ -141,7 +143,7 @@ export default async function AgentProfilePage({ params }: { params: Promise<{ i
             <li>/</li>
             <li><Link href="/#agents" className="hover:text-white transition">Agents</Link></li>
             <li>/</li>
-            <li className="text-orange-400">{agent.display_name || agent.name}</li>
+            <li className="text-orange-400">{displayName}</li>
           </ol>
         </nav>
 
@@ -171,7 +173,7 @@ export default async function AgentProfilePage({ params }: { params: Promise<{ i
                 {/* Agent Info */}
                 <div className="flex-grow">
                   <div className="flex items-center gap-3 mb-2">
-                    <h1 className="text-3xl font-bold text-white">{agent.display_name || agent.name}</h1>
+                    <h1 className="text-3xl font-bold text-white">{displayName}</h1>
                     {agent.is_verified && (
                       <span className="text-blue-400 text-xl" title="Verified Agent">✓</span>
                     )}
@@ -242,9 +244,19 @@ export default async function AgentProfilePage({ params }: { params: Promise<{ i
                           <h3 className="text-lg font-semibold text-white mb-1">{gig.title}</h3>
                           <p className="text-gray-400 text-sm line-clamp-2">{gig.description}</p>
                         </div>
-                        <div className="flex-shrink-0 text-right">
-                          <div className="text-2xl font-bold text-orange-400">${gig.price_usdc}</div>
-                          <div className="text-gray-400 text-sm">USDC</div>
+                        <div className="flex-shrink-0 text-right flex flex-col items-end gap-2">
+                          <div>
+                            <div className="text-2xl font-bold text-orange-400">${gig.price_usdc}</div>
+                            <div className="text-gray-400 text-sm">USDC</div>
+                          </div>
+                          <HireButton
+                            gigTitle={gig.title}
+                            amount={gig.price_usdc}
+                            agentName={displayName}
+                            gigId={gig.id}
+                            agentId={agent.id}
+                            variant="small"
+                          />
                         </div>
                       </div>
                     </div>
@@ -336,69 +348,13 @@ export default async function AgentProfilePage({ params }: { params: Promise<{ i
 
           {/* Sidebar - Hire Card */}
           <div className="lg:col-span-1">
-            <div className="sticky top-8">
-              <div className="bg-gray-800 rounded-2xl p-6 border border-gray-700">
-                <div className="text-center mb-6">
-                  <div className="text-gray-400 mb-1">Starting at</div>
-                  <div className="text-4xl font-bold text-orange-400">
-                    ${agent.hourly_rate_usdc} <span className="text-lg text-gray-400">USDC</span>
-                  </div>
-                  <div className="text-gray-400 text-sm">per hour</div>
-                </div>
-
-                {/* Hire CTA Button */}
-                <button className="w-full bg-orange-500 hover:bg-orange-600 text-white py-4 rounded-xl font-bold text-lg transition mb-4 flex items-center justify-center gap-2">
-                  <span>⚡</span> Hire This Agent
-                </button>
-
-                <button className="w-full bg-gray-700 hover:bg-gray-600 text-white py-3 rounded-xl font-medium transition">
-                  Contact Agent
-                </button>
-
-                {/* Quick Stats */}
-                <div className="mt-6 pt-6 border-t border-gray-700 space-y-3">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-400">Response time</span>
-                    <span className="text-white font-medium">~5 min</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-400">Completion rate</span>
-                    <span className="text-white font-medium">100%</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-400">On-time delivery</span>
-                    <span className="text-white font-medium">100%</span>
-                  </div>
-                </div>
-
-                {/* Payment Info */}
-                <div className="mt-6 p-4 bg-orange-500/10 rounded-xl border border-orange-500/20">
-                  <div className="flex items-center gap-2 text-orange-400 text-sm font-medium mb-2">
-                    <span>🔒</span> Secure x402 Payment
-                  </div>
-                  <p className="text-gray-400 text-xs">
-                    Pay instantly with USDC on Solana. Settlement in ~400ms. No invoices, no delays.
-                  </p>
-                </div>
-              </div>
-
-              {/* Trust Badges */}
-              <div className="mt-4 bg-gray-800/50 rounded-xl p-4 border border-gray-700">
-                <div className="flex items-center justify-center gap-4 text-gray-400 text-xs">
-                  {agent.is_verified && (
-                    <div className="flex items-center gap-1">
-                      <span className="text-blue-400">✓</span> Verified
-                    </div>
-                  )}
-                  <div className="flex items-center gap-1">
-                    <span>🛡️</span> Escrow Protected
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <span>⚡</span> Instant Pay
-                  </div>
-                </div>
-              </div>
-            </div>
+            <AgentHireCard
+              agentId={agent.id}
+              agentName={agent.name}
+              displayName={displayName}
+              hourlyRate={agent.hourly_rate_usdc}
+              isVerified={agent.is_verified}
+            />
           </div>
         </div>
       </div>
