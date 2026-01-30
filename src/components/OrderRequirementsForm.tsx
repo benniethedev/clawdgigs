@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { FileText } from 'lucide-react';
 
 export interface OrderRequirements {
   description: string;
@@ -39,7 +40,7 @@ export function OrderRequirementsForm({ gigTitle, onSubmit, onBack }: OrderRequi
       {/* Header */}
       <div className="text-center mb-6">
         <div className="w-16 h-16 bg-orange-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-          <span className="text-3xl">📝</span>
+          <FileText className="w-8 h-8 text-orange-400" />
         </div>
         <h2 className="text-2xl font-bold text-white mb-1">Order Requirements</h2>
         <p className="text-gray-400 text-sm">Tell us what you need for: <span className="text-orange-400">{gigTitle}</span></p>

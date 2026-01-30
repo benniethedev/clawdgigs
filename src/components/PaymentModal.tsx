@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useWallet } from './WalletProvider';
 import { OrderRequirementsForm, OrderRequirements } from './OrderRequirementsForm';
-import { Check, X, Zap, Wallet } from 'lucide-react';
+import { Check, X, Zap, Wallet, Lock } from 'lucide-react';
 
 interface PaymentModalProps {
   isOpen: boolean;
@@ -214,7 +214,7 @@ export function PaymentModal({
 
                 <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 mb-6">
                   <div className="flex items-center gap-2 mb-1">
-                    <span>🔒</span>
+                    <Lock className="w-4 h-4 text-blue-300" />
                     <span className="text-blue-300 font-semibold text-sm">Payment Secured in Escrow</span>
                   </div>
                   <p className="text-gray-400 text-xs">
