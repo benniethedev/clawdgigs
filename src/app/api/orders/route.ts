@@ -8,6 +8,11 @@ interface OrderWithAgent extends Order {
     display_name: string;
     avatar_url: string;
   };
+  gig?: {
+    id: string;
+    title: string;
+    description: string;
+  };
 }
 
 // POST /api/orders - Create a new order after payment
@@ -82,11 +87,12 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// GET /api/orders?wallet=xxx&include_agents=true - Get orders for a client wallet
+// GET /api/orders?wallet=xxx&include_agents=true&include_gigs=true - Get orders for a client wallet
 export async function GET(req: NextRequest) {
   try {
     const wallet = req.nextUrl.searchParams.get('wallet');
     const includeAgents = req.nextUrl.searchParams.get('include_agents') === 'true';
+    const includeGigs = req.nextUrl.searchParams.get('include_gigs') === 'true';
 
     if (!wallet) {
       return NextResponse.json(
@@ -97,18 +103,21 @@ export async function GET(req: NextRequest) {
 
     const orders = await getOrdersByClient(wallet);
 
-    // If include_agents is requested, fetch agent info for each unique agent
-    let ordersWithAgents: OrderWithAgent[] = orders;
+    // Build enriched orders with agent and gig info
+    let enrichedOrders: OrderWithAgent[] = orders;
     
-    if (includeAgents && orders.length > 0) {
-      // Get unique agent IDs
+    if ((includeAgents || includeGigs) && orders.length > 0) {
+      // Get unique agent IDs and gig IDs
       const agentIds = [...new Set(orders.map(o => o.agent_id))];
+      const gigIds = [...new Set(orders.map(o => o.gig_id))];
       
-      // Fetch all agents in parallel
-      const agentPromises = agentIds.map(id => getAgent(id));
-      const agents = await Promise.all(agentPromises);
+      // Fetch all agents and gigs in parallel
+      const [agents, gigs] = await Promise.all([
+        includeAgents ? Promise.all(agentIds.map(id => getAgent(id))) : [],
+        includeGigs ? Promise.all(gigIds.map(id => getGig(id))) : [],
+      ]);
       
-      // Create a map for quick lookup
+      // Create maps for quick lookup
       const agentMap = new Map<string, { id: string; name: string; display_name: string; avatar_url: string }>();
       agents.forEach(agent => {
         if (agent) {
@@ -121,16 +130,28 @@ export async function GET(req: NextRequest) {
         }
       });
       
-      // Attach agent info to orders
-      ordersWithAgents = orders.map(order => ({
+      const gigMap = new Map<string, { id: string; title: string; description: string }>();
+      gigs.forEach(gig => {
+        if (gig) {
+          gigMap.set(gig.id, {
+            id: gig.id,
+            title: gig.title,
+            description: gig.description,
+          });
+        }
+      });
+      
+      // Attach agent and gig info to orders
+      enrichedOrders = orders.map(order => ({
         ...order,
         agent: agentMap.get(order.agent_id),
+        gig: gigMap.get(order.gig_id),
       }));
     }
 
     return NextResponse.json({
       success: true,
-      orders: ordersWithAgents,
+      orders: enrichedOrders,
     });
   } catch (error) {
     console.error('Get orders error:', error);

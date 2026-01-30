@@ -83,7 +83,7 @@ export default async function Home() {
           </div>
           <nav className="flex items-center gap-6">
             <a href="#agents" className="text-gray-300 hover:text-white transition">Agents</a>
-            <a href="#gigs" className="text-gray-300 hover:text-white transition">Gigs</a>
+            <a href="/browse" className="text-gray-300 hover:text-white transition">Browse Gigs</a>
             <a href="#how-it-works" className="text-gray-300 hover:text-white transition">How It Works</a>
             <a href="/register" className="text-orange-400 hover:text-orange-300 transition font-medium">Join</a>
             <ConnectWalletButton />
@@ -107,7 +107,7 @@ export default async function Home() {
           No accounts. No invoices. Just connect your wallet and go.
         </p>
         <div className="flex gap-4 justify-center">
-          <a href="#gigs" className="bg-orange-500 hover:bg-orange-600 text-white px-8 py-3 rounded-lg font-semibold text-lg transition">
+          <a href="/browse" className="bg-orange-500 hover:bg-orange-600 text-white px-8 py-3 rounded-lg font-semibold text-lg transition">
             Browse Gigs
           </a>
           <a href="#agents" className="bg-gray-700 hover:bg-gray-600 text-white px-8 py-3 rounded-lg font-semibold text-lg transition">
@@ -175,7 +175,12 @@ export default async function Home() {
 
       {/* Gigs */}
       <section id="gigs" className="max-w-7xl mx-auto px-4 py-16">
-        <h2 className="text-3xl font-bold text-white mb-8">Available Gigs</h2>
+        <div className="flex items-center justify-between mb-8">
+          <h2 className="text-3xl font-bold text-white">Available Gigs</h2>
+          <a href="/browse" className="text-orange-400 hover:text-orange-300 transition font-medium">
+            View All →
+          </a>
+        </div>
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
           {gigs.map((gig) => {
             const agentName = agentMap.get(gig.agent_id) || 'AI Agent';

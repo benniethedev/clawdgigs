@@ -8,7 +8,7 @@ import { ConnectWalletButton } from '@/components/ConnectWalletButton';
 import { 
   Wallet, ClipboardList, Clock, CreditCard, Cog, Package, 
   RotateCcw, CheckCircle, AlertTriangle, XCircle, HelpCircle,
-  Search, Filter, Calendar, Bot, ChevronDown, X, Star
+  Search, Filter, Calendar, Bot, ChevronDown, X, Star, RefreshCw, FileText
 } from 'lucide-react';
 
 interface Order {
@@ -30,8 +30,15 @@ interface Agent {
   avatar_url: string;
 }
 
-interface OrderWithAgent extends Order {
+interface Gig {
+  id: string;
+  title: string;
+  description: string;
+}
+
+interface OrderWithDetails extends Order {
   agent?: Agent;
+  gig?: Gig;
 }
 
 const STATUS_OPTIONS = [
@@ -56,7 +63,7 @@ const DATE_RANGE_OPTIONS = [
 
 export default function OrdersPage() {
   const { connected, publicKey } = useWallet();
-  const [orders, setOrders] = useState<OrderWithAgent[]>([]);
+  const [orders, setOrders] = useState<OrderWithDetails[]>([]);
   const [loading, setLoading] = useState(false);
   
   // Filter states
@@ -71,7 +78,7 @@ export default function OrdersPage() {
     
     setLoading(true);
     try {
-      const res = await fetch(`/api/orders?wallet=${publicKey}&include_agents=true`);
+      const res = await fetch(`/api/orders?wallet=${publicKey}&include_agents=true&include_gigs=true`);
       const data = await res.json();
       if (data.success) {
         setOrders(data.orders || []);
@@ -443,72 +450,79 @@ export default function OrdersPage() {
             ) : (
               <div className="space-y-4">
                 {sortedOrders.map((order) => (
-                  <Link
+                  <div
                     key={order.id}
-                    href={`/orders/${order.id}`}
-                    className="block bg-gray-800 rounded-xl p-6 border border-gray-700 hover:border-orange-500/50 transition"
+                    className="bg-gray-800 rounded-xl p-6 border border-gray-700 hover:border-orange-500/50 transition"
                   >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-grow">
-                        {/* Agent Info */}
-                        {order.agent && (
-                          <div className="flex items-center gap-2 mb-3">
-                            <div className="w-8 h-8 rounded-lg bg-orange-500/20 flex items-center justify-center overflow-hidden">
-                              {order.agent.avatar_url ? (
-                                <Image 
-                                  src={order.agent.avatar_url} 
-                                  alt={order.agent.name} 
-                                  width={32} 
-                                  height={32} 
-                                  className="rounded-lg"
-                                />
-                              ) : (
-                                <Bot className="w-4 h-4 text-orange-400" />
-                              )}
+                    <Link href={`/orders/${order.id}`} className="block">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-grow">
+                          {/* Gig Title */}
+                          {order.gig && (
+                            <div className="flex items-center gap-2 mb-2">
+                              <FileText className="w-4 h-4 text-orange-400" />
+                              <span className="text-orange-400 font-semibold">
+                                {order.gig.title}
+                              </span>
                             </div>
-                            <span className="text-white font-medium">
-                              {order.agent.display_name || order.agent.name}
+                          )}
+                          
+                          {/* Agent Info */}
+                          {order.agent && (
+                            <div className="flex items-center gap-2 mb-3">
+                              <div className="w-8 h-8 rounded-lg bg-orange-500/20 flex items-center justify-center overflow-hidden">
+                                {order.agent.avatar_url ? (
+                                  <Image 
+                                    src={order.agent.avatar_url} 
+                                    alt={order.agent.name} 
+                                    width={32} 
+                                    height={32} 
+                                    className="rounded-lg"
+                                  />
+                                ) : (
+                                  <Bot className="w-4 h-4 text-orange-400" />
+                                )}
+                              </div>
+                              <span className="text-white font-medium">
+                                {order.agent.display_name || order.agent.name}
+                              </span>
+                            </div>
+                          )}
+                          
+                          <div className="flex items-center gap-3 mb-2">
+                            <span className={`px-3 py-1 rounded-full text-sm font-medium border flex items-center gap-1.5 ${getStatusColor(order.status)}`}>
+                              {getStatusIcon(order.status)} {getStatusLabel(order.status)}
+                            </span>
+                            <span className="text-gray-400 text-sm">
+                              Order #{order.id.slice(0, 8)}
                             </span>
                           </div>
-                        )}
-                        
-                        <div className="flex items-center gap-3 mb-2">
-                          <span className={`px-3 py-1 rounded-full text-sm font-medium border flex items-center gap-1.5 ${getStatusColor(order.status)}`}>
-                            {getStatusIcon(order.status)} {getStatusLabel(order.status)}
-                          </span>
-                          <span className="text-gray-400 text-sm">
-                            Order #{order.id.slice(0, 8)}
-                          </span>
+                          <p className="text-gray-300 line-clamp-2 mb-2">{order.requirements_description}</p>
+                          <div className="text-gray-400 text-sm">
+                            {new Date(order.created_at).toLocaleDateString('en-US', {
+                              year: 'numeric',
+                              month: 'short',
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </div>
                         </div>
-                        <p className="text-white line-clamp-2 mb-2">{order.requirements_description}</p>
-                        <div className="text-gray-400 text-sm">
-                          {new Date(order.created_at).toLocaleDateString('en-US', {
-                            year: 'numeric',
-                            month: 'short',
-                            day: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
+                        <div className="text-right">
+                          <div className="text-2xl font-bold text-orange-400">
+                            ${order.amount_usdc}
+                          </div>
+                          <div className="text-gray-400 text-sm">USDC</div>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <div className="text-2xl font-bold text-orange-400">
-                          ${order.amount_usdc}
-                        </div>
-                        <div className="text-gray-400 text-sm">USDC</div>
-                      </div>
-                    </div>
+                    </Link>
+                    
+                    {/* Status Messages */}
                     {order.status === 'delivered' && (
-                      <div className="mt-4 pt-4 border-t border-gray-700 flex items-center gap-2 text-green-400">
+                      <Link href={`/orders/${order.id}`} className="mt-4 pt-4 border-t border-gray-700 flex items-center gap-2 text-green-400">
                         <Package className="w-4 h-4" />
-                        <span className="font-medium">Delivery ready - Click to view</span>
-                      </div>
-                    )}
-                    {order.status === 'completed' && (
-                      <div className="mt-4 pt-4 border-t border-gray-700 flex items-center gap-2 text-green-400">
-                        <Star className="w-4 h-4" />
-                        <span className="font-medium">Order completed - Leave a review</span>
-                      </div>
+                        <span className="font-medium">Delivery ready - Click to view files</span>
+                      </Link>
                     )}
                     {order.status === 'revision_requested' && (
                       <div className="mt-4 pt-4 border-t border-gray-700 flex items-center gap-2 text-orange-400">
@@ -528,7 +542,51 @@ export default function OrdersPage() {
                         <span className="font-medium">Payment received - Agent will start soon</span>
                       </div>
                     )}
-                  </Link>
+                    {order.status === 'in_progress' && (
+                      <div className="mt-4 pt-4 border-t border-gray-700 flex items-center gap-2 text-blue-400">
+                        <Cog className="w-4 h-4 animate-spin" />
+                        <span className="font-medium">Agent is working on your order</span>
+                      </div>
+                    )}
+                    
+                    {/* Quick Actions for Completed Orders */}
+                    {order.status === 'completed' && (
+                      <div className="mt-4 pt-4 border-t border-gray-700 flex flex-wrap items-center gap-3">
+                        <Link
+                          href={`/orders/${order.id}`}
+                          className="flex items-center gap-2 bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-400 px-4 py-2 rounded-lg text-sm font-medium transition"
+                        >
+                          <Star className="w-4 h-4" /> Leave Review
+                        </Link>
+                        {order.gig && (
+                          <Link
+                            href={`/gigs/${order.gig.id}`}
+                            className="flex items-center gap-2 bg-orange-500/20 hover:bg-orange-500/30 text-orange-400 px-4 py-2 rounded-lg text-sm font-medium transition"
+                          >
+                            <RefreshCw className="w-4 h-4" /> Re-order
+                          </Link>
+                        )}
+                        <Link
+                          href={`/orders/${order.id}`}
+                          className="flex items-center gap-2 bg-green-500/20 hover:bg-green-500/30 text-green-400 px-4 py-2 rounded-lg text-sm font-medium transition ml-auto"
+                        >
+                          <Package className="w-4 h-4" /> View Delivery
+                        </Link>
+                      </div>
+                    )}
+                    
+                    {/* Re-order for Cancelled/Disputed */}
+                    {['cancelled', 'disputed'].includes(order.status) && order.gig && (
+                      <div className="mt-4 pt-4 border-t border-gray-700 flex items-center gap-3">
+                        <Link
+                          href={`/gigs/${order.gig.id}`}
+                          className="flex items-center gap-2 bg-orange-500/20 hover:bg-orange-500/30 text-orange-400 px-4 py-2 rounded-lg text-sm font-medium transition"
+                        >
+                          <RefreshCw className="w-4 h-4" /> Try Again
+                        </Link>
+                      </div>
+                    )}
+                  </div>
                 ))}
               </div>
             )}
