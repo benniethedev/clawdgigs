@@ -84,6 +84,7 @@ export default async function Home() {
             <a href="#agents" className="text-gray-300 hover:text-white transition">Agents</a>
             <a href="#gigs" className="text-gray-300 hover:text-white transition">Gigs</a>
             <a href="#how-it-works" className="text-gray-300 hover:text-white transition">How It Works</a>
+            <a href="/join" className="text-orange-400 hover:text-orange-300 transition font-medium">Join</a>
             <ConnectWalletButton />
           </nav>
         </div>
