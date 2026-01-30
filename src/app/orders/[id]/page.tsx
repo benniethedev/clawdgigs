@@ -231,18 +231,80 @@ export default async function OrderDetailPage({ params }: PageProps) {
         )}
 
         {/* Actions */}
-        <div className="flex gap-4">
+        <div className="flex flex-col gap-4">
+          {/* Delivery Actions */}
+          {delivery && order.status === 'delivered' && (
+            <div className="flex gap-4">
+              <form action={`/api/orders/${order.id}/transition`} method="POST" className="flex-1">
+                <input type="hidden" name="action" value="accept" />
+                <input type="hidden" name="role" value="client" />
+                <input type="hidden" name="wallet" value={order.client_wallet} />
+                <button 
+                  type="submit"
+                  className="w-full bg-green-500 hover:bg-green-600 text-white py-3 rounded-xl font-semibold transition"
+                >
+                  ✅ Accept Delivery
+                </button>
+              </form>
+              <form action={`/api/orders/${order.id}/transition`} method="POST" className="flex-1">
+                <input type="hidden" name="action" value="request_revision" />
+                <input type="hidden" name="role" value="client" />
+                <input type="hidden" name="wallet" value={order.client_wallet} />
+                <button 
+                  type="submit"
+                  className="w-full bg-orange-500 hover:bg-orange-600 text-white py-3 rounded-xl font-semibold transition"
+                >
+                  🔄 Request Revision
+                </button>
+              </form>
+            </div>
+          )}
+          
+          {/* Dispute Option (after delivery or during revision) */}
+          {(order.status === 'delivered' || order.status === 'revision_requested') && (
+            <form action={`/api/orders/${order.id}/transition`} method="POST">
+              <input type="hidden" name="action" value="dispute" />
+              <input type="hidden" name="role" value="client" />
+              <input type="hidden" name="wallet" value={order.client_wallet} />
+              <button 
+                type="submit"
+                className="w-full bg-red-500/20 hover:bg-red-500/30 text-red-400 py-3 rounded-xl font-semibold border border-red-500/30 transition"
+              >
+                ⚠️ Open Dispute
+              </button>
+            </form>
+          )}
+
+          {/* Cancel Option (before work starts) */}
+          {(order.status === 'pending' || order.status === 'paid') && (
+            <form action={`/api/orders/${order.id}/transition`} method="POST">
+              <input type="hidden" name="action" value="cancel" />
+              <input type="hidden" name="role" value="client" />
+              <input type="hidden" name="wallet" value={order.client_wallet} />
+              <button 
+                type="submit"
+                className="w-full bg-gray-600 hover:bg-gray-500 text-gray-300 py-3 rounded-xl font-semibold transition"
+              >
+                ❌ Cancel Order
+              </button>
+            </form>
+          )}
+          
+          {/* Completed Status */}
+          {order.status === 'completed' && (
+            <div className="bg-green-500/20 border border-green-500/30 rounded-xl p-4 text-center">
+              <span className="text-green-400 font-semibold">✅ Order Completed</span>
+              <p className="text-gray-400 text-sm mt-1">Thank you for using ClawdGigs!</p>
+            </div>
+          )}
+
+          {/* Back Button */}
           <Link
             href="/orders"
-            className="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-3 rounded-xl font-semibold text-center transition"
+            className="block bg-gray-700 hover:bg-gray-600 text-white py-3 rounded-xl font-semibold text-center transition"
           >
             ← Back to Orders
           </Link>
-          {delivery && (
-            <button className="flex-1 bg-orange-500 hover:bg-orange-600 text-white py-3 rounded-xl font-semibold transition">
-              Mark as Complete
-            </button>
-          )}
         </div>
       </div>
     </div>
