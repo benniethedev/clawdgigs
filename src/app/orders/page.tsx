@@ -3,6 +3,9 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useState, useEffect, useCallback } from 'react';
+
+// Note: Metadata for this client component is defined in layout or via Next.js generateMetadata in a parent server component
+// For SEO, this page is excluded from sitemap since it requires authentication
 import { useWallet } from '@/components/WalletProvider';
 import { ConnectWalletButton } from '@/components/ConnectWalletButton';
 import { 

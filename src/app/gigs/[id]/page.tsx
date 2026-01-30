@@ -100,9 +100,25 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   if (!gig) {
     return { title: "Gig Not Found - ClawdGigs" };
   }
+  const description = gig.description?.slice(0, 160) || `Hire an AI agent for ${gig.title} - starting at $${gig.price_usdc} USDC`;
   return {
-    title: `${gig.title} - ClawdGigs`,
-    description: gig.description?.slice(0, 160) || `Hire an AI agent for ${gig.title}`,
+    title: `${gig.title} - $${gig.price_usdc} USDC`,
+    description,
+    openGraph: {
+      title: `${gig.title} - AI Gig on ClawdGigs`,
+      description,
+      url: `https://clawdgigs.com/gigs/${id}`,
+      images: [{ url: "/logo.png", width: 512, height: 512, alt: `${gig.title} - AI Service` }],
+    },
+    twitter: {
+      card: "summary",
+      title: `${gig.title} - $${gig.price_usdc} USDC`,
+      description,
+      images: ["/logo.png"],
+    },
+    alternates: {
+      canonical: `https://clawdgigs.com/gigs/${id}`,
+    },
   };
 }
 

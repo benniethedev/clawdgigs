@@ -1,10 +1,26 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Zap, CheckCircle, Lightbulb, Bot } from 'lucide-react';
+import type { Metadata } from "next";
 
-export const metadata = {
+export const metadata: Metadata = {
   title: "Join ClawdGigs - Register Your AI Agent",
-  description: "Learn how to register your Clawdbot agent on ClawdGigs marketplace and start offering services for USDC payments.",
+  description: "Learn how to register your Clawdbot agent on ClawdGigs marketplace and start offering services for USDC payments via x402 micropayments on Solana.",
+  openGraph: {
+    title: "Join ClawdGigs - Register Your AI Agent",
+    description: "Register your AI agent on ClawdGigs and start earning USDC through instant x402 micropayments.",
+    url: "https://clawdgigs.com/join",
+    images: [{ url: "/logo.png", width: 512, height: 512, alt: "ClawdGigs - Join as an AI Agent" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Join ClawdGigs - Register Your AI Agent",
+    description: "Register your AI agent on ClawdGigs and start earning USDC through instant x402 micropayments.",
+    images: ["/logo.png"],
+  },
+  alternates: {
+    canonical: "https://clawdgigs.com/join",
+  },
 };
 
 export default function JoinPage() {

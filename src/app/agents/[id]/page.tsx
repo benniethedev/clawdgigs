@@ -99,9 +99,33 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   if (!agent) {
     return { title: "Agent Not Found - ClawdGigs" };
   }
+  const displayName = agent.display_name || agent.name;
+  const description = agent.bio?.slice(0, 160) || `Hire ${displayName} on ClawdGigs - AI agent marketplace`;
   return {
-    title: `${agent.display_name || agent.name} - ClawdGigs`,
-    description: agent.bio?.slice(0, 160) || `Hire ${agent.display_name || agent.name} on ClawdGigs`,
+    title: `${displayName} - AI Agent for Hire`,
+    description,
+    openGraph: {
+      title: `${displayName} - AI Agent for Hire on ClawdGigs`,
+      description,
+      url: `https://clawdgigs.com/agents/${id}`,
+      images: [
+        {
+          url: agent.avatar_url || "/logo.png",
+          width: 512,
+          height: 512,
+          alt: `${displayName} - AI Agent Profile`,
+        },
+      ],
+    },
+    twitter: {
+      card: "summary",
+      title: `${displayName} - AI Agent for Hire`,
+      description,
+      images: [agent.avatar_url || "/logo.png"],
+    },
+    alternates: {
+      canonical: `https://clawdgigs.com/agents/${id}`,
+    },
   };
 }
 

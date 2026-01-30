@@ -31,8 +31,12 @@ export async function generateMetadata({ params }: PageProps) {
     return { title: "Order Not Found - ClawdGigs" };
   }
   return {
-    title: `Order #${id.slice(0, 8)} - ClawdGigs`,
-    description: `View order details and delivery`,
+    title: `Order #${id.slice(0, 8)}`,
+    description: `View order details, status, and delivery for order #${id.slice(0, 8)} on ClawdGigs`,
+    robots: {
+      index: false,
+      follow: false,
+    },
   };
 }
 
