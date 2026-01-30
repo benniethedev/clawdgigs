@@ -207,19 +207,19 @@ export default async function GigDetailPage({ params }: { params: Promise<{ id: 
               </h2>
               <ul className="space-y-3">
                 <li className="flex items-center gap-3 text-gray-300">
-                  <span className="text-green-400">✓</span>
+                  <CheckCircle className="w-5 h-5 text-green-400" />
                   Delivery within {gig.delivery_time}
                 </li>
                 <li className="flex items-center gap-3 text-gray-300">
-                  <span className="text-green-400">✓</span>
+                  <CheckCircle className="w-5 h-5 text-green-400" />
                   Unlimited revisions until satisfied
                 </li>
                 <li className="flex items-center gap-3 text-gray-300">
-                  <span className="text-green-400">✓</span>
+                  <CheckCircle className="w-5 h-5 text-green-400" />
                   Direct communication with AI agent
                 </li>
                 <li className="flex items-center gap-3 text-gray-300">
-                  <span className="text-green-400">✓</span>
+                  <CheckCircle className="w-5 h-5 text-green-400" />
                   Full ownership of deliverables
                 </li>
               </ul>
@@ -256,7 +256,7 @@ export default async function GigDetailPage({ params }: { params: Promise<{ id: 
                         {agent.display_name || agent.name}
                       </Link>
                       {agent.is_verified && (
-                        <span className="text-blue-400" title="Verified Agent">✓</span>
+                        <CheckCircle className="w-5 h-5 text-blue-400"  />
                       )}
                       {agent.is_featured && (
                         <span className="bg-orange-500 text-white text-xs px-2 py-0.5 rounded">Featured</span>
@@ -428,7 +428,7 @@ export default async function GigDetailPage({ params }: { params: Promise<{ id: 
                 {/* Payment Info */}
                 <div className="mt-6 p-4 bg-orange-500/10 rounded-xl border border-orange-500/20">
                   <div className="flex items-center gap-2 text-orange-400 text-sm font-medium mb-2">
-                    <span>🔒</span> Secure x402 Payment
+                    <Lock className="w-4 h-4" /> Secure x402 Payment
                   </div>
                   <p className="text-gray-400 text-xs">
                     Pay instantly with USDC on Solana. Settlement in ~400ms. Escrow protection included.
@@ -451,13 +451,13 @@ export default async function GigDetailPage({ params }: { params: Promise<{ id: 
                             className="rounded-lg"
                           />
                         ) : (
-                          <span className="text-xl">🤖</span>
+                          <Bot className="w-6 h-6 text-orange-400" />
                         )}
                       </div>
                       <div className="flex-grow">
                         <div className="flex items-center gap-1">
                           <span className="text-white font-medium">{agent.display_name || agent.name}</span>
-                          {agent.is_verified && <span className="text-blue-400 text-sm">✓</span>}
+                          {agent.is_verified && <CheckCircle className="w-4 h-4 text-blue-400" />}
                         </div>
                         <div className="flex items-center gap-2 text-sm">
                           <span className="text-yellow-400">★</span>
@@ -474,13 +474,13 @@ export default async function GigDetailPage({ params }: { params: Promise<{ id: 
               <div className="mt-4 bg-gray-800/50 rounded-xl p-4 border border-gray-700">
                 <div className="flex items-center justify-center gap-4 text-gray-400 text-xs">
                   <div className="flex items-center gap-1">
-                    <span>🛡️</span> Escrow
+                    <Shield className="w-3.5 h-3.5" /> Escrow
                   </div>
                   <div className="flex items-center gap-1">
-                    <span>⚡</span> Instant Pay
+                    <Zap className="w-3.5 h-3.5" /> Instant Pay
                   </div>
                   <div className="flex items-center gap-1">
-                    <span>🔄</span> Revisions
+                    <RotateCcw className="w-3.5 h-3.5" /> Revisions
                   </div>
                 </div>
               </div>
