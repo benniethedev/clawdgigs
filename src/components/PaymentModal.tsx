@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useWallet } from './WalletProvider';
+import { OrderRequirementsForm, OrderRequirements } from './OrderRequirementsForm';
 
 interface PaymentModalProps {
   isOpen: boolean;
@@ -13,6 +14,7 @@ interface PaymentModalProps {
   agentId?: string;
 }
 
+type ModalStep = 'requirements' | 'payment';
 type PaymentStatus = 'idle' | 'connecting' | 'signing' | 'verifying' | 'success' | 'error';
 
 export function PaymentModal({ 
@@ -25,11 +27,23 @@ export function PaymentModal({
   agentId 
 }: PaymentModalProps) {
   const { connected, publicKey, connect, connecting, signMessage } = useWallet();
+  const [step, setStep] = useState<ModalStep>('requirements');
+  const [orderRequirements, setOrderRequirements] = useState<OrderRequirements | null>(null);
   const [status, setStatus] = useState<PaymentStatus>('idle');
   const [error, setError] = useState<string | null>(null);
   const [txSignature, setTxSignature] = useState<string | null>(null);
+  const [orderId, setOrderId] = useState<string | null>(null);
 
   if (!isOpen) return null;
+
+  const handleRequirementsSubmit = (requirements: OrderRequirements) => {
+    setOrderRequirements(requirements);
+    setStep('payment');
+  };
+
+  const handleBackToRequirements = () => {
+    setStep('requirements');
+  };
 
   const handlePayment = async () => {
     setError(null);
@@ -52,6 +66,7 @@ export function PaymentModal({
           agentId,
           amount,
           payer: publicKey,
+          orderRequirements,
         }),
       });
 
@@ -107,6 +122,7 @@ export function PaymentModal({
           gigId,
           agentId,
           amount,
+          orderRequirements,
         }),
       });
 
@@ -118,6 +134,7 @@ export function PaymentModal({
 
       // Success!
       setTxSignature(verifyData.txSignature || signatureBase64.slice(0, 16) + '...');
+      setOrderId(verifyData.orderId || null);
       setStatus('success');
 
     } catch (err) {
@@ -128,6 +145,8 @@ export function PaymentModal({
   };
 
   const resetAndClose = () => {
+    setStep('requirements');
+    setOrderRequirements(null);
     setStatus('idle');
     setError(null);
     setTxSignature(null);
@@ -143,9 +162,9 @@ export function PaymentModal({
       />
       
       {/* Modal */}
-      <div className="relative bg-gray-800 rounded-2xl p-8 max-w-md w-full mx-4 border border-gray-700 shadow-2xl">
+      <div className="relative bg-gray-800 rounded-2xl p-8 max-w-lg w-full mx-4 border border-gray-700 shadow-2xl max-h-[90vh] overflow-y-auto">
         {/* Close button */}
-        {(status === 'idle' || status === 'error' || status === 'success') && (
+        {(step === 'requirements' || status === 'idle' || status === 'error' || status === 'success') && (
           <button
             onClick={resetAndClose}
             className="absolute top-4 right-4 text-gray-400 hover:text-white transition"
@@ -154,153 +173,203 @@ export function PaymentModal({
           </button>
         )}
 
-        {/* Success State */}
-        {status === 'success' && (
-          <div className="text-center">
-            <div className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
-              <span className="text-5xl">✓</span>
-            </div>
-            <h2 className="text-2xl font-bold text-white mb-2">Payment Successful!</h2>
-            <p className="text-gray-400 mb-6">
-              Your payment of <span className="text-orange-400 font-semibold">${amount} USDC</span> has been confirmed.
-            </p>
-            
-            {txSignature && (
-              <div className="bg-gray-700/50 rounded-lg p-4 mb-6">
-                <div className="text-gray-400 text-sm mb-1">Transaction ID</div>
-                <div className="text-white font-mono text-sm break-all">{txSignature}</div>
+        {/* Step 1: Order Requirements */}
+        {step === 'requirements' && (
+          <OrderRequirementsForm
+            gigTitle={gigTitle}
+            onSubmit={handleRequirementsSubmit}
+          />
+        )}
+
+        {/* Step 2: Payment */}
+        {step === 'payment' && (
+          <>
+            {/* Success State */}
+            {status === 'success' && (
+              <div className="text-center">
+                <div className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <span className="text-5xl">✓</span>
+                </div>
+                <h2 className="text-2xl font-bold text-white mb-2">Payment Successful!</h2>
+                <p className="text-gray-400 mb-6">
+                  Your payment of <span className="text-orange-400 font-semibold">${amount} USDC</span> has been confirmed.
+                </p>
+                
+                {txSignature && (
+                  <div className="bg-gray-700/50 rounded-lg p-4 mb-6">
+                    <div className="text-gray-400 text-sm mb-1">Transaction ID</div>
+                    <div className="text-white font-mono text-sm break-all">{txSignature}</div>
+                  </div>
+                )}
+
+                {/* Order Summary */}
+                {orderRequirements && (
+                  <div className="bg-gray-700/30 rounded-lg p-4 mb-6 text-left">
+                    <div className="text-gray-400 text-sm mb-2">Your Order Requirements</div>
+                    <p className="text-white text-sm line-clamp-3">{orderRequirements.description}</p>
+                  </div>
+                )}
+
+                <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-4 mb-6">
+                  <p className="text-orange-300 text-sm">
+                    <span className="font-semibold">{agentName}</span> will begin working on your request immediately.
+                  </p>
+                </div>
+
+                <button
+                  onClick={resetAndClose}
+                  className="w-full bg-orange-500 hover:bg-orange-600 text-white py-3 rounded-xl font-semibold transition"
+                >
+                  Done
+                </button>
               </div>
             )}
 
-            <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-4 mb-6">
-              <p className="text-orange-300 text-sm">
-                <span className="font-semibold">{agentName}</span> will begin working on your request immediately.
-              </p>
-            </div>
-
-            <button
-              onClick={resetAndClose}
-              className="w-full bg-orange-500 hover:bg-orange-600 text-white py-3 rounded-xl font-semibold transition"
-            >
-              Done
-            </button>
-          </div>
-        )}
-
-        {/* Error State */}
-        {status === 'error' && (
-          <div className="text-center">
-            <div className="w-20 h-20 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
-              <span className="text-5xl">✕</span>
-            </div>
-            <h2 className="text-2xl font-bold text-white mb-2">Payment Failed</h2>
-            <p className="text-gray-400 mb-4">{error || 'An unexpected error occurred'}</p>
-            
-            <div className="flex gap-3">
-              <button
-                onClick={resetAndClose}
-                className="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-3 rounded-xl font-semibold transition"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => { setStatus('idle'); setError(null); }}
-                className="flex-1 bg-orange-500 hover:bg-orange-600 text-white py-3 rounded-xl font-semibold transition"
-              >
-                Try Again
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Loading States */}
-        {(status === 'connecting' || status === 'signing' || status === 'verifying') && (
-          <div className="text-center py-8">
-            <div className="w-16 h-16 border-4 border-orange-500/30 border-t-orange-500 rounded-full animate-spin mx-auto mb-6" />
-            <h2 className="text-xl font-bold text-white mb-2">
-              {status === 'connecting' && 'Connecting Wallet...'}
-              {status === 'signing' && 'Awaiting Signature...'}
-              {status === 'verifying' && 'Verifying Payment...'}
-            </h2>
-            <p className="text-gray-400 text-sm">
-              {status === 'connecting' && 'Please approve the connection in your wallet'}
-              {status === 'signing' && 'Please sign the payment message in your wallet'}
-              {status === 'verifying' && 'Confirming with x402 facilitator...'}
-            </p>
-          </div>
-        )}
-
-        {/* Idle State - Payment Details */}
-        {status === 'idle' && (
-          <>
-            <div className="text-center mb-6">
-              <div className="w-16 h-16 bg-orange-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="text-3xl">⚡</span>
-              </div>
-              <h2 className="text-2xl font-bold text-white mb-1">Confirm Payment</h2>
-              <p className="text-gray-400">via x402 Protocol</p>
-            </div>
-
-            {/* Payment Details */}
-            <div className="bg-gray-700/50 rounded-xl p-5 mb-6 space-y-3">
-              <div className="flex justify-between">
-                <span className="text-gray-400">Service</span>
-                <span className="text-white font-medium text-right max-w-[200px] truncate">{gigTitle}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">Agent</span>
-                <span className="text-white font-medium">{agentName}</span>
-              </div>
-              <div className="border-t border-gray-600 pt-3 flex justify-between">
-                <span className="text-gray-400">Amount</span>
-                <span className="text-2xl font-bold text-orange-400">${amount} <span className="text-sm font-normal">USDC</span></span>
-              </div>
-            </div>
-
-            {/* Wallet Status */}
-            {connected ? (
-              <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3 mb-6 flex items-center gap-3">
-                <span className="text-green-400">✓</span>
-                <div>
-                  <div className="text-green-400 text-sm font-medium">Wallet Connected</div>
-                  <div className="text-gray-400 text-xs font-mono">
-                    {publicKey?.slice(0, 4)}...{publicKey?.slice(-4)}
-                  </div>
+            {/* Error State */}
+            {status === 'error' && (
+              <div className="text-center">
+                <div className="w-20 h-20 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <span className="text-5xl">✕</span>
+                </div>
+                <h2 className="text-2xl font-bold text-white mb-2">Payment Failed</h2>
+                <p className="text-gray-400 mb-4">{error || 'An unexpected error occurred'}</p>
+                
+                <div className="flex gap-3">
+                  <button
+                    onClick={handleBackToRequirements}
+                    className="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-3 rounded-xl font-semibold transition"
+                  >
+                    Edit Order
+                  </button>
+                  <button
+                    onClick={() => { setStatus('idle'); setError(null); }}
+                    className="flex-1 bg-orange-500 hover:bg-orange-600 text-white py-3 rounded-xl font-semibold transition"
+                  >
+                    Try Again
+                  </button>
                 </div>
               </div>
-            ) : (
-              <div className="bg-gray-700/30 border border-gray-600 rounded-lg p-3 mb-6 flex items-center gap-3">
-                <span className="text-gray-400">👛</span>
-                <div className="text-gray-400 text-sm">Connect your wallet to pay</div>
+            )}
+
+            {/* Loading States */}
+            {(status === 'connecting' || status === 'signing' || status === 'verifying') && (
+              <div className="text-center py-8">
+                <div className="w-16 h-16 border-4 border-orange-500/30 border-t-orange-500 rounded-full animate-spin mx-auto mb-6" />
+                <h2 className="text-xl font-bold text-white mb-2">
+                  {status === 'connecting' && 'Connecting Wallet...'}
+                  {status === 'signing' && 'Awaiting Signature...'}
+                  {status === 'verifying' && 'Verifying Payment...'}
+                </h2>
+                <p className="text-gray-400 text-sm">
+                  {status === 'connecting' && 'Please approve the connection in your wallet'}
+                  {status === 'signing' && 'Please sign the payment message in your wallet'}
+                  {status === 'verifying' && 'Confirming with x402 facilitator...'}
+                </p>
               </div>
             )}
 
-            {/* Action Button */}
-            <button
-              onClick={handlePayment}
-              disabled={connecting}
-              className="w-full bg-orange-500 hover:bg-orange-600 disabled:bg-gray-600 text-white py-4 rounded-xl font-bold text-lg transition flex items-center justify-center gap-2"
-            >
-              {connecting ? (
-                <>
-                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  Connecting...
-                </>
-              ) : connected ? (
-                <>
-                  <span>⚡</span> Pay ${amount} USDC
-                </>
-              ) : (
-                <>
-                  <span>👛</span> Connect Wallet
-                </>
-              )}
-            </button>
+            {/* Idle State - Payment Details */}
+            {status === 'idle' && (
+              <>
+                <div className="text-center mb-6">
+                  <div className="w-16 h-16 bg-orange-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <span className="text-3xl">⚡</span>
+                  </div>
+                  <h2 className="text-2xl font-bold text-white mb-1">Confirm Payment</h2>
+                  <p className="text-gray-400">via x402 Protocol</p>
+                </div>
 
-            {/* Info */}
-            <p className="text-gray-500 text-xs text-center mt-4">
-              Powered by SolPay x402 • Settles in ~400ms on Solana
-            </p>
+                {/* Order Summary */}
+                {orderRequirements && (
+                  <div className="bg-gray-700/30 rounded-xl p-4 mb-4 border border-gray-600">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-gray-400 text-sm font-medium">Your Requirements</span>
+                      <button 
+                        onClick={handleBackToRequirements}
+                        className="text-orange-400 text-sm hover:text-orange-300 transition"
+                      >
+                        Edit
+                      </button>
+                    </div>
+                    <p className="text-white text-sm line-clamp-2">{orderRequirements.description}</p>
+                    {orderRequirements.inputs && (
+                      <p className="text-gray-400 text-xs mt-1 line-clamp-1">
+                        + Inputs: {orderRequirements.inputs}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Payment Details */}
+                <div className="bg-gray-700/50 rounded-xl p-5 mb-6 space-y-3">
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Service</span>
+                    <span className="text-white font-medium text-right max-w-[200px] truncate">{gigTitle}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Agent</span>
+                    <span className="text-white font-medium">{agentName}</span>
+                  </div>
+                  <div className="border-t border-gray-600 pt-3 flex justify-between">
+                    <span className="text-gray-400">Amount</span>
+                    <span className="text-2xl font-bold text-orange-400">${amount} <span className="text-sm font-normal">USDC</span></span>
+                  </div>
+                </div>
+
+                {/* Wallet Status */}
+                {connected ? (
+                  <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3 mb-6 flex items-center gap-3">
+                    <span className="text-green-400">✓</span>
+                    <div>
+                      <div className="text-green-400 text-sm font-medium">Wallet Connected</div>
+                      <div className="text-gray-400 text-xs font-mono">
+                        {publicKey?.slice(0, 4)}...{publicKey?.slice(-4)}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-gray-700/30 border border-gray-600 rounded-lg p-3 mb-6 flex items-center gap-3">
+                    <span className="text-gray-400">👛</span>
+                    <div className="text-gray-400 text-sm">Connect your wallet to pay</div>
+                  </div>
+                )}
+
+                {/* Action Buttons */}
+                <div className="flex gap-3">
+                  <button
+                    onClick={handleBackToRequirements}
+                    className="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-4 rounded-xl font-semibold transition"
+                  >
+                    ← Back
+                  </button>
+                  <button
+                    onClick={handlePayment}
+                    disabled={connecting}
+                    className="flex-[2] bg-orange-500 hover:bg-orange-600 disabled:bg-gray-600 text-white py-4 rounded-xl font-bold text-lg transition flex items-center justify-center gap-2"
+                  >
+                    {connecting ? (
+                      <>
+                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        Connecting...
+                      </>
+                    ) : connected ? (
+                      <>
+                        <span>⚡</span> Pay ${amount} USDC
+                      </>
+                    ) : (
+                      <>
+                        <span>👛</span> Connect Wallet
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {/* Info */}
+                <p className="text-gray-500 text-xs text-center mt-4">
+                  Powered by SolPay x402 • Settles in ~400ms on Solana
+                </p>
+              </>
+            )}
           </>
         )}
       </div>

@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { HireButton } from "@/components/HireButton";
 
 interface Agent {
   id: string;
@@ -390,9 +391,15 @@ export default async function GigDetailPage({ params }: { params: Promise<{ id: 
                 </div>
 
                 {/* Hire Now CTA */}
-                <button className="w-full bg-orange-500 hover:bg-orange-600 text-white py-4 rounded-xl font-bold text-lg transition mb-4 flex items-center justify-center gap-2 shadow-lg shadow-orange-500/20">
-                  <span>⚡</span> Hire Now
-                </button>
+                <HireButton
+                  gigTitle={gig.title}
+                  amount={gig.price_usdc}
+                  agentName={agent?.display_name || agent?.name || 'AI Agent'}
+                  gigId={gig.id}
+                  agentId={gig.agent_id}
+                  variant="primary"
+                  className="w-full py-4 rounded-xl font-bold text-lg mb-4 shadow-lg shadow-orange-500/20"
+                />
 
                 <button className="w-full bg-gray-700 hover:bg-gray-600 text-white py-3 rounded-xl font-medium transition">
                   Contact Agent First

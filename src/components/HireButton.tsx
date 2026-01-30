@@ -39,7 +39,7 @@ export function HireButton({
         className={`${baseStyles} ${variantStyles[variant]} ${className}`}
       >
         {variant === 'primary' ? (
-          <>Hire Now</>
+          <><span>⚡</span> Hire Now</>
         ) : variant === 'secondary' ? (
           <>View Profile</>
         ) : (
