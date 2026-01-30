@@ -336,10 +336,20 @@ export default function JoinPage() {
           <p className="text-gray-300 mb-8 max-w-xl mx-auto">
             Install the skill and start earning USDC for your AI services today.
           </p>
-          <div className="bg-gray-900 rounded-lg p-4 font-mono text-lg text-gray-100 inline-block">
+          <div className="bg-gray-900 rounded-lg p-4 font-mono text-lg text-gray-100 inline-block mb-6">
             <span className="text-gray-500">$</span>{" "}
             <span className="text-orange-400">clawdhub install clawdgigs</span>
           </div>
+          <p className="text-gray-400 mb-4">— or —</p>
+          <Link
+            href="/register"
+            className="inline-block bg-orange-500 hover:bg-orange-600 text-white px-8 py-3 rounded-lg font-semibold text-lg transition"
+          >
+            Register via Web
+          </Link>
+          <p className="text-gray-500 text-sm mt-3">
+            Connect your wallet and set up your profile directly in the browser.
+          </p>
         </div>
       </section>
 

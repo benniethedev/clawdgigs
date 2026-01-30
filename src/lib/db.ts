@@ -212,6 +212,38 @@ export async function getAgent(id: string): Promise<Agent | null> {
   return null;
 }
 
+// Get agent by wallet address
+export async function getAgentByWallet(walletAddress: string): Promise<Agent | null> {
+  const result = await apiRequest('agents', { where: `wallet_address:eq:${walletAddress}` });
+  if (result.ok && result.data) {
+    const data = result.data as { data?: Agent[] };
+    return data.data?.[0] || null;
+  }
+  return null;
+}
+
+// Create new agent
+export async function createAgent(agent: Omit<Agent, 'id' | 'created_at' | 'updated_at' | 'rating' | 'total_jobs' | 'is_verified' | 'is_featured'>): Promise<{ ok: boolean; data?: Agent; error?: string }> {
+  const result = await apiRequest('agents', {
+    method: 'POST',
+    data: {
+      ...agent,
+      rating: '5.0',
+      total_jobs: '0',
+      is_verified: false,
+      is_featured: false,
+      status: 'active',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    },
+  });
+  
+  if (result.ok && result.data) {
+    return { ok: true, data: result.data as Agent };
+  }
+  return { ok: false, error: result.error || 'Failed to create agent' };
+}
+
 // Update agent profile (including webhook_url)
 export async function updateAgent(id: string, updates: Partial<Omit<Agent, 'id' | 'created_at'>>): Promise<boolean> {
   const result = await apiRequest('agents', {
@@ -220,4 +252,47 @@ export async function updateAgent(id: string, updates: Partial<Omit<Agent, 'id' 
     data: { ...updates, updated_at: new Date().toISOString() },
   });
   return result.ok;
+}
+
+// Gig type
+export interface Gig {
+  id: string;
+  agent_id: string;
+  title: string;
+  description: string;
+  category: string;
+  price_usdc: string;
+  price_type: 'fixed' | 'hourly';
+  delivery_time: string;
+  status: 'active' | 'paused' | 'deleted';
+  created_at: string;
+  updated_at: string;
+}
+
+// Create new gig
+export async function createGig(gig: Omit<Gig, 'id' | 'created_at' | 'updated_at' | 'status'>): Promise<{ ok: boolean; data?: Gig; error?: string }> {
+  const result = await apiRequest('gigs', {
+    method: 'POST',
+    data: {
+      ...gig,
+      status: 'active',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    },
+  });
+  
+  if (result.ok && result.data) {
+    return { ok: true, data: result.data as Gig };
+  }
+  return { ok: false, error: result.error || 'Failed to create gig' };
+}
+
+// Get gigs by agent
+export async function getGigsByAgent(agentId: string): Promise<Gig[]> {
+  const result = await apiRequest('gigs', { where: `agent_id:eq:${agentId}` });
+  if (result.ok && result.data) {
+    const data = result.data as { data?: Gig[] };
+    return data.data || [];
+  }
+  return [];
 }
