@@ -1,13 +1,22 @@
 'use client';
 
-import { useState } from 'react';
-import { FileText, Mail } from 'lucide-react';
+import { useState, useRef, useCallback } from 'react';
+import { FileText, Mail, Upload, X, File, Loader2 } from 'lucide-react';
+
+export interface UploadedFile {
+  id: string;
+  name: string;
+  url: string;
+  size: number;
+  type: string;
+}
 
 export interface OrderRequirements {
   description: string;
   inputs: string;
   deliveryPreferences: string;
-  email?: string; // Optional email for notifications
+  email?: string;
+  files?: UploadedFile[];
 }
 
 interface OrderRequirementsFormProps {
@@ -16,16 +25,89 @@ interface OrderRequirementsFormProps {
   onBack?: () => void;
 }
 
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
 export function OrderRequirementsForm({ gigTitle, onSubmit, onBack }: OrderRequirementsFormProps) {
   const [description, setDescription] = useState('');
   const [inputs, setInputs] = useState('');
   const [deliveryPreferences, setDeliveryPreferences] = useState('');
   const [email, setEmail] = useState('');
-  const [errors, setErrors] = useState<{ description?: string; email?: string }>({});
+  const [errors, setErrors] = useState<{ description?: string; email?: string; files?: string }>({});
+  
+  // File upload state
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileUpload = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+
+    // Validate file count (max 10 files total)
+    if (uploadedFiles.length + files.length > 10) {
+      setErrors(prev => ({ ...prev, files: 'Maximum 10 files allowed' }));
+      return;
+    }
+
+    setIsUploading(true);
+    setErrors(prev => ({ ...prev, files: undefined }));
+
+    try {
+      const formData = new FormData();
+      Array.from(files).forEach(file => {
+        formData.append('files', file);
+      });
+
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const result = await res.json();
+
+      if (!res.ok || !result.success) {
+        throw new Error(result.error || 'Upload failed');
+      }
+
+      setUploadedFiles(prev => [...prev, ...result.files]);
+    } catch (error) {
+      console.error('Upload error:', error);
+      setErrors(prev => ({
+        ...prev,
+        files: error instanceof Error ? error.message : 'Failed to upload files',
+      }));
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    handleFileUpload(e.dataTransfer.files);
+  }, []);
+
+  const removeFile = (fileId: string) => {
+    setUploadedFiles(prev => prev.filter(f => f.id !== fileId));
+  };
 
   const handleSubmit = () => {
     // Validate required fields
-    const newErrors: { description?: string; email?: string } = {};
+    const newErrors: { description?: string; email?: string; files?: string } = {};
     
     if (!description.trim()) {
       newErrors.description = 'Please describe what you need done';
@@ -46,6 +128,7 @@ export function OrderRequirementsForm({ gigTitle, onSubmit, onBack }: OrderRequi
       inputs: inputs.trim(),
       deliveryPreferences: deliveryPreferences.trim(),
       email: email.trim() || undefined,
+      files: uploadedFiles.length > 0 ? uploadedFiles : undefined,
     });
   };
 
@@ -69,7 +152,7 @@ export function OrderRequirementsForm({ gigTitle, onSubmit, onBack }: OrderRequi
           value={description}
           onChange={(e) => {
             setDescription(e.target.value);
-            if (errors.description) setErrors({});
+            if (errors.description) setErrors(prev => ({ ...prev, description: undefined }));
           }}
           placeholder="Describe your project requirements, goals, and expectations..."
           rows={4}
@@ -83,19 +166,102 @@ export function OrderRequirementsForm({ gigTitle, onSubmit, onBack }: OrderRequi
         <p className="text-gray-500 text-xs mt-1">Be as specific as possible for the best results</p>
       </div>
 
+      {/* File Upload Section */}
+      <div>
+        <label className="block text-white font-medium mb-2">
+          <span className="flex items-center gap-2">
+            <Upload className="w-4 h-4 text-orange-400" />
+            Upload Files <span className="text-gray-500 font-normal">(optional)</span>
+          </span>
+        </label>
+        
+        {/* Drag & Drop Zone */}
+        <div
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+          onClick={() => fileInputRef.current?.click()}
+          className={`relative border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all ${
+            isDragOver
+              ? 'border-orange-500 bg-orange-500/10'
+              : errors.files
+              ? 'border-red-500 bg-red-500/5'
+              : 'border-gray-600 hover:border-gray-500 bg-gray-700/30'
+          }`}
+        >
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            onChange={(e) => handleFileUpload(e.target.files)}
+            className="hidden"
+          />
+          
+          {isUploading ? (
+            <div className="flex flex-col items-center gap-2">
+              <Loader2 className="w-8 h-8 text-orange-400 animate-spin" />
+              <p className="text-gray-400">Uploading...</p>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center gap-2">
+              <Upload className={`w-8 h-8 ${isDragOver ? 'text-orange-400' : 'text-gray-500'}`} />
+              <p className="text-gray-400">
+                <span className="text-orange-400 font-medium">Click to upload</span> or drag and drop
+              </p>
+              <p className="text-gray-500 text-xs">Max 5MB per file • Up to 10 files</p>
+            </div>
+          )}
+        </div>
+
+        {errors.files && (
+          <p className="text-red-400 text-sm mt-1">{errors.files}</p>
+        )}
+
+        {/* Uploaded Files List */}
+        {uploadedFiles.length > 0 && (
+          <div className="mt-3 space-y-2">
+            {uploadedFiles.map((file) => (
+              <div
+                key={file.id}
+                className="flex items-center justify-between bg-gray-700/50 rounded-lg px-3 py-2 group"
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <File className="w-4 h-4 text-orange-400 flex-shrink-0" />
+                  <span className="text-white text-sm truncate">{file.name}</span>
+                  <span className="text-gray-500 text-xs flex-shrink-0">({formatFileSize(file.size)})</span>
+                </div>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    removeFile(file.id);
+                  }}
+                  className="text-gray-500 hover:text-red-400 transition p-1"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <p className="text-gray-500 text-xs mt-2">
+          Upload code files, documents, images, or any reference materials
+        </p>
+      </div>
+
       {/* Specific Inputs - Optional */}
       <div>
         <label className="block text-white font-medium mb-2">
-          Specific Inputs <span className="text-gray-500 font-normal">(optional)</span>
+          Additional Links or Notes <span className="text-gray-500 font-normal">(optional)</span>
         </label>
         <textarea
           value={inputs}
           onChange={(e) => setInputs(e.target.value)}
-          placeholder="URLs, file links, reference materials, data to work with..."
+          placeholder="URLs, reference links, or additional notes..."
           rows={3}
           className="w-full bg-gray-700 border border-gray-600 rounded-xl px-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:border-orange-500 transition resize-none"
         />
-        <p className="text-gray-500 text-xs mt-1">Include any URLs, files, or data the agent needs to complete the work</p>
+        <p className="text-gray-500 text-xs mt-1">Include any URLs or additional context the agent needs</p>
       </div>
 
       {/* Delivery Preferences - Optional */}
@@ -151,9 +317,17 @@ export function OrderRequirementsForm({ gigTitle, onSubmit, onBack }: OrderRequi
         )}
         <button
           onClick={handleSubmit}
-          className="flex-1 bg-orange-500 hover:bg-orange-600 text-white py-3 rounded-xl font-bold transition flex items-center justify-center gap-2"
+          disabled={isUploading}
+          className="flex-1 bg-orange-500 hover:bg-orange-600 disabled:bg-gray-600 text-white py-3 rounded-xl font-bold transition flex items-center justify-center gap-2"
         >
-          Continue to Payment <span>→</span>
+          {isUploading ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Uploading...
+            </>
+          ) : (
+            <>Continue to Payment <span>→</span></>
+          )}
         </button>
       </div>
     </div>

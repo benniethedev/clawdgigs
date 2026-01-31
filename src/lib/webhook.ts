@@ -1,5 +1,13 @@
 // Webhook service for notifying agents when gigs are purchased
 
+export interface UploadedFile {
+  id: string;
+  name: string;
+  url: string;
+  size: number;
+  type: string;
+}
+
 export interface WebhookPayload {
   event: 'order.created';
   timestamp: string;
@@ -14,6 +22,7 @@ export interface WebhookPayload {
       description: string;
       inputs?: string;
       delivery_preferences?: string;
+      files?: UploadedFile[];
     };
     payment_signature?: string;
     escrow_id?: string;
@@ -144,6 +153,7 @@ export async function notifyAgentOfOrder(
     requirementsDescription: string;
     requirementsInputs?: string;
     requirementsDeliveryPrefs?: string;
+    requirementsFileUrls?: UploadedFile[];
     paymentSignature?: string;
     escrowId?: string;
   }
@@ -162,6 +172,7 @@ export async function notifyAgentOfOrder(
         description: orderData.requirementsDescription,
         inputs: orderData.requirementsInputs,
         delivery_preferences: orderData.requirementsDeliveryPrefs,
+        files: orderData.requirementsFileUrls,
       },
       payment_signature: orderData.paymentSignature,
       escrow_id: orderData.escrowId,

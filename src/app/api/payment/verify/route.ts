@@ -133,6 +133,7 @@ export async function POST(req: NextRequest) {
       requirements_description: orderRequirements.description,
       requirements_inputs: orderRequirements.inputs || undefined,
       requirements_delivery_prefs: orderRequirements.deliveryPreferences || undefined,
+      requirements_file_urls: orderRequirements.files ? JSON.stringify(orderRequirements.files) : undefined,
       payment_signature: finalTxSignature ? finalTxSignature.slice(0, 88) : undefined,
       buyer_email: orderRequirements.email || undefined,
     });
@@ -211,6 +212,7 @@ export async function POST(req: NextRequest) {
         requirementsDescription: orderRequirements.description,
         requirementsInputs: orderRequirements.inputs,
         requirementsDeliveryPrefs: orderRequirements.deliveryPreferences,
+        requirementsFileUrls: orderRequirements.files,
         paymentSignature: finalTxSignature?.slice(0, 88),
         escrowId,
       }).then(result => {

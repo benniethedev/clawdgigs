@@ -50,6 +50,7 @@ export interface Order {
   requirements_description: string;
   requirements_inputs?: string;
   requirements_delivery_prefs?: string;
+  requirements_file_urls?: string; // JSON array of uploaded file info
   payment_signature?: string;
   escrow_id?: string;
   buyer_email?: string; // Optional email for notifications

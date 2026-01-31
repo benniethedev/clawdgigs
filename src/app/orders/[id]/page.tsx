@@ -9,8 +9,22 @@ import { ReviewSection } from "@/components/ReviewSection";
 import { 
   Clock, CreditCard, Cog, Package, RotateCcw, CheckCircle, 
   AlertTriangle, XCircle, HelpCircle, FileText, Bot, Lock, Hourglass, Undo2,
-  RefreshCw
+  RefreshCw, File, Download
 } from 'lucide-react';
+
+interface UploadedFile {
+  id: string;
+  name: string;
+  url: string;
+  size: number;
+  type: string;
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
 
 // Map escrow icon names to Lucide components
 const escrowIconMap: Record<EscrowIconName, React.ReactNode> = {
@@ -278,6 +292,39 @@ export default async function OrderDetailPage({ params }: PageProps) {
                 <p className="text-white whitespace-pre-wrap">{order.requirements_delivery_prefs}</p>
               </div>
             )}
+            {order.requirements_file_urls && (() => {
+              try {
+                const files: UploadedFile[] = JSON.parse(order.requirements_file_urls);
+                if (files.length > 0) {
+                  return (
+                    <div>
+                      <div className="text-gray-400 text-sm mb-2">Uploaded Files</div>
+                      <div className="space-y-2">
+                        {files.map((file) => (
+                          <a
+                            key={file.id}
+                            href={file.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center justify-between bg-gray-700/50 hover:bg-gray-700 rounded-lg px-3 py-2 group transition"
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <File className="w-4 h-4 text-orange-400 flex-shrink-0" />
+                              <span className="text-white text-sm truncate">{file.name}</span>
+                              <span className="text-gray-500 text-xs flex-shrink-0">({formatFileSize(file.size)})</span>
+                            </div>
+                            <Download className="w-4 h-4 text-gray-500 group-hover:text-orange-400 transition flex-shrink-0" />
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                }
+              } catch {
+                // Invalid JSON, skip
+              }
+              return null;
+            })()}
           </div>
         </div>
 

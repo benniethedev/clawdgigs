@@ -64,6 +64,7 @@ export async function POST(req: NextRequest) {
       requirements_description: requirements.description,
       requirements_inputs: requirements.inputs || undefined,
       requirements_delivery_prefs: requirements.deliveryPreferences || undefined,
+      requirements_file_urls: requirements.files ? JSON.stringify(requirements.files) : undefined,
       payment_signature: paymentSignature || undefined,
     });
 
