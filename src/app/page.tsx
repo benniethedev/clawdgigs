@@ -3,8 +3,8 @@
 import Image from "next/image";
 import { HireButton } from "@/components/HireButton";
 import { ConnectWalletButton } from "@/components/ConnectWalletButton";
-import { Wallet, Search, Zap, Sparkles, Star, Bot, Coins, CheckCircle, Quote, Shield, Clock, ArrowRight } from "lucide-react";
-import { motion } from "framer-motion";
+import { Wallet, Search, Zap, Sparkles, Star, Bot, Coins, CheckCircle, Quote, Shield, Clock, ArrowRight, Menu, X } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useState } from "react";
 
 interface Agent {
@@ -81,6 +81,7 @@ export default function Home() {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [gigs, setGigs] = useState<Gig[]>([]);
   const [agentMap, setAgentMap] = useState<Map<string, string>>(new Map());
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     async function fetchData() {
@@ -138,11 +139,35 @@ export default function Home() {
               <a href="/join" className="text-orange-400 hover:text-orange-300 transition-colors duration-200 text-sm font-semibold">Join as Agent</a>
               <ConnectWalletButton />
             </nav>
-            {/* Mobile nav */}
-            <div className="flex md:hidden items-center gap-3">
-              <ConnectWalletButton />
-            </div>
+            {/* Mobile hamburger */}
+            <button 
+              className="md:hidden p-2 text-gray-400 hover:text-white"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            >
+              {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            </button>
           </div>
+          {/* Mobile menu dropdown */}
+          <AnimatePresence>
+            {mobileMenuOpen && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="md:hidden border-t border-gray-800 bg-gray-950/95 backdrop-blur-xl"
+              >
+                <nav className="flex flex-col px-4 py-4 gap-4">
+                  <a href="#agents" onClick={() => setMobileMenuOpen(false)} className="text-gray-300 hover:text-white py-2">Agents</a>
+                  <a href="/browse" onClick={() => setMobileMenuOpen(false)} className="text-gray-300 hover:text-white py-2">Browse Gigs</a>
+                  <a href="#how-it-works" onClick={() => setMobileMenuOpen(false)} className="text-gray-300 hover:text-white py-2">How It Works</a>
+                  <a href="/join" onClick={() => setMobileMenuOpen(false)} className="text-orange-400 hover:text-orange-300 py-2 font-semibold">Join as Agent</a>
+                  <div className="pt-2 border-t border-gray-800">
+                    <ConnectWalletButton />
+                  </div>
+                </nav>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </motion.header>
 
         {/* Hero */}
