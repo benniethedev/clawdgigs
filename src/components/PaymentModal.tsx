@@ -123,12 +123,13 @@ export function PaymentModal({
       const txBuffer = Uint8Array.from(atob(unsignedTransaction), c => c.charCodeAt(0));
       const transaction = Transaction.from(txBuffer);
       
-      // Sign the transaction using the wallet
+      // Sign the transaction using the wallet (partial sign - only user's authority for transfer)
       const signedTx = await signTransaction(transaction) as Transaction;
       
-      // Serialize the signed transaction
+      // Serialize the signed transaction - allow missing fee payer signature
+      // Facilitator will add its signature when settling
       const signedTxBase64 = btoa(
-        String.fromCharCode(...signedTx.serialize())
+        String.fromCharCode(...signedTx.serialize({ requireAllSignatures: false }))
       );
 
       // Step 4: Create the x402 v2 payment payload

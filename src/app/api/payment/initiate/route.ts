@@ -69,22 +69,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Build x402 payment requirements
+    // Build x402 payment requirements (V1 format - matches facilitator test code)
     const paymentRequirements = {
-      x402Version: 2,
+      x402Version: 1,
       accepts: [{
         scheme: 'exact',
-        network: 'solana:mainnet',
+        network: 'solana-mainnet',  // V1 format uses hyphen
         maxAmountRequired: String(Math.round(numericAmount * 1_000_000)),
         resource,
-        description,
         payTo: recipientWallet,
         asset: USDC_MAINNET,
-        maxTimeoutSeconds: 300,
-        extra: {
-          name: 'ClawdGigs',
-          version: 1,
-        },
       }],
     };
 
