@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getOrder, updateOrderStatus } from '@/lib/db';
+import { getOrder, updateOrderStatus, getAgent, updateAgent } from '@/lib/db';
 import { releaseEscrow, getEscrow, formatEscrowAmount, getPlatformWallet } from '@/lib/escrow';
 import { canTransition } from '@/lib/order-state-machine';
 
@@ -62,6 +62,22 @@ export async function POST(
         { error: 'Failed to update order status' },
         { status: 500 }
       );
+    }
+
+    // Update agent stats (total_jobs and total_earned_usdc)
+    const agent = await getAgent(order.agent_id);
+    if (agent) {
+      const newTotalJobs = (parseInt(agent.total_jobs) || 0) + 1;
+      const newTotalEarned = (parseFloat(agent.total_earned_usdc || '0') || 0) + parseFloat(order.amount_usdc);
+      await updateAgent(order.agent_id, {
+        total_jobs: String(newTotalJobs),
+        total_earned_usdc: String(newTotalEarned.toFixed(2)),
+      });
+      console.log('Agent stats updated:', {
+        agentId: order.agent_id,
+        totalJobs: newTotalJobs,
+        totalEarned: newTotalEarned.toFixed(2),
+      });
     }
 
     // Release escrow if exists

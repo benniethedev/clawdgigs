@@ -207,6 +207,7 @@ export interface Agent {
   hourly_rate_usdc: string;
   rating: string;
   total_jobs: string;
+  total_earned_usdc: string;
   is_verified: boolean;
   is_featured: boolean;
   wallet_address: string;
@@ -236,13 +237,14 @@ export async function getAgentByWallet(walletAddress: string): Promise<Agent | n
 }
 
 // Create new agent
-export async function createAgent(agent: Omit<Agent, 'id' | 'created_at' | 'updated_at' | 'rating' | 'total_jobs' | 'is_verified' | 'is_featured'>): Promise<{ ok: boolean; data?: Agent; error?: string }> {
+export async function createAgent(agent: Omit<Agent, 'id' | 'created_at' | 'updated_at' | 'rating' | 'total_jobs' | 'total_earned_usdc' | 'is_verified' | 'is_featured'>): Promise<{ ok: boolean; data?: Agent; error?: string }> {
   const result = await apiRequest('agents', {
     method: 'POST',
     data: {
       ...agent,
       rating: '5.0',
       total_jobs: '0',
+      total_earned_usdc: '0',
       is_verified: false,
       is_featured: false,
       status: 'active',
