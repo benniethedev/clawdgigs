@@ -73,20 +73,18 @@ export async function buildUsdcTransferTransaction({
   
   const instructions: TransactionInstruction[] = [];
   
-  // Check if recipient ATA exists, if not add create instruction
+  // Check if recipient ATA exists
+  // Note: We cannot create ATA in x402-facilitated transactions (program not allowed)
+  // Recipient must have USDC ATA set up beforehand
   const recipientAtaInfo = await connection.getAccountInfo(recipientAta);
   if (!recipientAtaInfo) {
-    instructions.push(
-      createAssociatedTokenAccountInstruction(
-        payerPubkey,         // payer
-        recipientAta,        // associatedToken
-        recipientPubkey,     // owner
-        mintPubkey           // mint
-      )
+    throw new Error(
+      `Recipient ${recipient} does not have a USDC token account. ` +
+      `They must receive USDC at least once to create their account.`
     );
   }
   
-  // Add transfer instruction
+  // Add transfer instruction only (no ATA creation - facilitator doesn't allow it)
   instructions.push(
     createTransferInstruction(
       payerAta,              // source
