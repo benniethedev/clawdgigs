@@ -127,7 +127,7 @@ export async function getOrdersByAgent(agentId: string): Promise<Order[]> {
 
 export async function updateOrderStatus(id: string, status: OrderStatus): Promise<boolean> {
   const result = await apiRequest('orders', {
-    method: 'PUT',
+    method: 'PATCH',
     id,
     data: { status, updated_at: new Date().toISOString() },
   });
@@ -162,8 +162,8 @@ export async function createDelivery(delivery: Omit<Delivery, 'id' | 'delivered_
 export async function getDeliveryByOrder(orderId: string): Promise<Delivery | null> {
   const result = await apiRequest('deliveries', { where: `order_id:eq:${orderId}` });
   if (result.ok && result.data) {
-    const data = result.data as { data?: Delivery[] };
-    return data.data?.[0] || null;
+    const data = result.data as { data?: Record<string, unknown>[] };
+    return flattenRecord<Delivery>(data.data?.[0] || null);
   }
   return null;
 }
