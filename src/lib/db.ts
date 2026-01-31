@@ -86,11 +86,22 @@ export async function createOrder(order: Omit<Order, 'id' | 'created_at' | 'upda
   return { ok: false, error: result.error || 'Failed to create order' };
 }
 
+// Helper to flatten PressBase schemaless records (where fields are nested under 'data')
+function flattenRecord<T>(record: Record<string, unknown> | null): T | null {
+  if (!record) return null;
+  if (record.data && typeof record.data === 'object' && !Array.isArray(record.data)) {
+    // Merge nested data with top-level fields (id, created_at, etc.)
+    const { data, ...topLevel } = record;
+    return { ...topLevel, ...(data as object) } as T;
+  }
+  return record as T;
+}
+
 export async function getOrder(id: string): Promise<Order | null> {
   const result = await apiRequest('orders', { where: `id:eq:${id}` });
   if (result.ok && result.data) {
-    const data = result.data as { data?: Order[] };
-    return data.data?.[0] || null;
+    const data = result.data as { data?: Record<string, unknown>[] };
+    return flattenRecord<Order>(data.data?.[0] || null);
   }
   return null;
 }
@@ -98,8 +109,8 @@ export async function getOrder(id: string): Promise<Order | null> {
 export async function getOrdersByClient(walletAddress: string): Promise<Order[]> {
   const result = await apiRequest('orders', { where: `client_wallet:eq:${walletAddress}` });
   if (result.ok && result.data) {
-    const data = result.data as { data?: Order[] };
-    return data.data || [];
+    const data = result.data as { data?: Record<string, unknown>[] };
+    return (data.data || []).map(r => flattenRecord<Order>(r)).filter((o): o is Order => o !== null);
   }
   return [];
 }
@@ -107,8 +118,8 @@ export async function getOrdersByClient(walletAddress: string): Promise<Order[]>
 export async function getOrdersByAgent(agentId: string): Promise<Order[]> {
   const result = await apiRequest('orders', { where: `agent_id:eq:${agentId}` });
   if (result.ok && result.data) {
-    const data = result.data as { data?: Order[] };
-    return data.data || [];
+    const data = result.data as { data?: Record<string, unknown>[] };
+    return (data.data || []).map(r => flattenRecord<Order>(r)).filter((o): o is Order => o !== null);
   }
   return [];
 }
