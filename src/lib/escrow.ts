@@ -137,21 +137,49 @@ export async function createEscrow(params: {
 }
 
 // Get escrow by ID
+// Helper to flatten PressBase records (data is nested under 'data' field)
+function flattenEscrow(record: Record<string, unknown> | null): Escrow | null {
+  if (!record) return null;
+  if (record.data && typeof record.data === 'object' && !Array.isArray(record.data)) {
+    const { data, id: rowId, ...topLevel } = record;
+    // Use the custom escrow ID from data, not the row ID
+    return { ...topLevel, ...(data as object), _rowId: rowId } as unknown as Escrow;
+  }
+  return record as Escrow;
+}
+
 export async function getEscrow(escrowId: string): Promise<Escrow | null> {
-  const result = await escrowDbRequest({ where: `id:eq:${escrowId}` });
+  // Workaround: PressBase stores custom ID in data.id, so fetch all and filter
+  const result = await escrowDbRequest({});
   if (result.ok && result.data) {
-    const data = result.data as { data?: Escrow[] };
-    return data.data?.[0] || null;
+    const data = result.data as { data?: Record<string, unknown>[] };
+    const records = data.data || [];
+    for (const record of records) {
+      const flattened = flattenEscrow(record);
+      if (flattened && flattened.id === escrowId) {
+        // Store the Pressbase row ID for updates
+        (flattened as unknown as Record<string, unknown>)._rowId = record.id;
+        return flattened;
+      }
+    }
   }
   return null;
 }
 
 // Get escrow by order ID
 export async function getEscrowByOrder(orderId: string): Promise<Escrow | null> {
-  const result = await escrowDbRequest({ where: `order_id:eq:${orderId}` });
+  // Workaround: PressBase stores order_id in data field, so fetch all and filter
+  const result = await escrowDbRequest({});
   if (result.ok && result.data) {
-    const data = result.data as { data?: Escrow[] };
-    return data.data?.[0] || null;
+    const data = result.data as { data?: Record<string, unknown>[] };
+    const records = data.data || [];
+    for (const record of records) {
+      const flattened = flattenEscrow(record);
+      if (flattened && flattened.order_id === orderId) {
+        (flattened as unknown as Record<string, unknown>)._rowId = record.id;
+        return flattened;
+      }
+    }
   }
   return null;
 }
@@ -159,28 +187,36 @@ export async function getEscrowByOrder(orderId: string): Promise<Escrow | null> 
 // Get all escrows due for auto-release
 // Alias: getEscrowsReadyForAutoRelease
 export async function getEscrowsForAutoRelease(): Promise<Escrow[]> {
-  // Get all funded escrows
-  const result = await escrowDbRequest({ where: `status:eq:funded` });
+  // Workaround: fetch all and filter for funded status
+  const result = await escrowDbRequest({});
   if (result.ok && result.data) {
-    const data = result.data as { data?: Escrow[] };
+    const data = result.data as { data?: Record<string, unknown>[] };
     const now = new Date();
-    // Filter to those past auto-release date
-    return (data.data || []).filter(escrow => {
-      if (!escrow.auto_release_at) return false;
-      return new Date(escrow.auto_release_at) <= now;
-    });
+    const escrows: Escrow[] = [];
+    for (const record of data.data || []) {
+      const flattened = flattenEscrow(record);
+      if (flattened && flattened.status === 'funded' && flattened.auto_release_at) {
+        if (new Date(flattened.auto_release_at) <= now) {
+          (flattened as unknown as Record<string, unknown>)._rowId = record.id;
+          escrows.push(flattened);
+        }
+      }
+    }
+    return escrows;
   }
   return [];
 }
 
 // Update escrow status
 async function updateEscrow(
-  escrowId: string, 
+  escrow: Escrow & { _rowId?: string }, 
   updates: Partial<Omit<Escrow, 'id' | 'created_at'>>
 ): Promise<{ ok: boolean; error?: string }> {
+  // Use the Pressbase row ID for the update, not the escrow ID
+  const rowId = (escrow as unknown as Record<string, unknown>)._rowId as string || escrow.id;
   const result = await escrowDbRequest({
-    method: 'PUT',
-    id: escrowId,
+    method: 'PATCH', // Use PATCH to merge into data field
+    id: rowId,
     data: { ...updates, updated_at: new Date().toISOString() },
   });
   return { ok: result.ok, error: result.error };
@@ -203,7 +239,7 @@ export async function markEscrowFunded(
   const now = new Date();
   const autoReleaseAt = new Date(now.getTime() + AUTO_RELEASE_MS);
 
-  return updateEscrow(escrowId, {
+  return updateEscrow(escrow, {
     status: 'funded',
     funding_tx_signature: fundingTxSignature,
     funded_at: now.toISOString(),
@@ -239,7 +275,7 @@ export async function releaseEscrow(
   }
 
   // Update escrow status in database
-  const result = await updateEscrow(escrowId, {
+  const result = await updateEscrow(escrow, {
     status: 'released',
     release_tx_signature: transferResult.txSignature || releaseTxSignature || null,
     released_at: new Date().toISOString(),
@@ -276,7 +312,7 @@ export async function refundEscrow(
     return { ok: false, error: `Refund transfer failed: ${transferResult.error}` };
   }
 
-  const result = await updateEscrow(escrowId, {
+  const result = await updateEscrow(escrow, {
     status: 'refunded',
     release_tx_signature: transferResult.txSignature || refundTxSignature || null,
     released_at: new Date().toISOString(),
@@ -312,7 +348,7 @@ export async function splitEscrow(
   const sellerPayout = sellerHalf - platformFeeFromSplit; // Seller gets 50% minus platform fee
 
   // Mark escrow as released (we use 'released' status for split as well)
-  const result = await updateEscrow(escrowId, {
+  const result = await updateEscrow(escrow, {
     status: 'released',
     release_tx_signature: splitTxSignature || `SPLIT-${Date.now()}`,
     released_at: new Date().toISOString(),
@@ -341,7 +377,7 @@ export async function disputeEscrow(
     return { ok: false, error: `Cannot dispute escrow in ${escrow.status} status` };
   }
 
-  const result = await updateEscrow(escrowId, {
+  const result = await updateEscrow(escrow, {
     status: 'disputed',
     dispute_reason: reason,
     disputed_at: new Date().toISOString(),
@@ -366,7 +402,7 @@ export async function cancelEscrow(escrowId: string): Promise<{ ok: boolean; err
     return { ok: false, error: `Cannot cancel escrow in ${escrow.status} status` };
   }
 
-  return updateEscrow(escrowId, { status: 'cancelled' });
+  return updateEscrow(escrow, { status: 'cancelled' });
 }
 
 // Get platform wallet address (from env or default)
