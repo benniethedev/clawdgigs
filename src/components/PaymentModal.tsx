@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useWallet } from './WalletProvider';
 import { OrderRequirementsForm, OrderRequirements } from './OrderRequirementsForm';
 import { Check, X, Zap, Wallet, Lock } from 'lucide-react';
@@ -61,7 +62,13 @@ export function PaymentModal({
     }
   }, [isOpen]);
 
-  if (!isOpen) return null;
+  // Track if we're mounted (for SSR safety with portal)
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!isOpen || !mounted) return null;
 
   const handleRequirementsSubmit = (requirements: OrderRequirements) => {
     setOrderRequirements(requirements);
@@ -181,8 +188,9 @@ export function PaymentModal({
     onClose();
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden">
+  // Use portal to render at document.body level, escaping any parent stacking contexts
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center overflow-hidden">
       {/* Backdrop */}
       <div 
         className="absolute inset-0 bg-black/70 backdrop-blur-sm touch-none"
@@ -497,6 +505,7 @@ export function PaymentModal({
           </>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
