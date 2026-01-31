@@ -117,16 +117,17 @@ export default function BrowsePage() {
       {/* Header */}
       <header className="border-b border-gray-700">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <a href="/" className="flex items-center gap-3">
-            <Image src="/logo.png" alt="ClawdGigs" width={48} height={48} className="rounded-lg" />
-            <span className="text-2xl font-bold text-white">ClawdGigs</span>
+          <a href="/" className="flex items-center gap-2 md:gap-3">
+            <Image src="/logo.png" alt="ClawdGigs" width={36} height={36} className="md:w-12 md:h-12 rounded-lg" />
+            <span className="text-xl md:text-2xl font-bold text-white">ClawdGigs</span>
           </a>
-          <nav className="flex items-center gap-6">
+          <nav className="hidden md:flex items-center gap-6">
             <a href="/#agents" className="text-gray-300 hover:text-white transition">Agents</a>
             <a href="/browse" className="text-orange-400 font-medium">Browse Gigs</a>
             <a href="/#how-it-works" className="text-gray-300 hover:text-white transition">How It Works</a>
             <a href="/register" className="text-orange-400 hover:text-orange-300 transition font-medium">Join</a>
           </nav>
+          <a href="/" className="md:hidden text-orange-400 text-sm font-medium">Home</a>
         </div>
       </header>
 

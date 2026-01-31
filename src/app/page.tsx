@@ -125,18 +125,23 @@ export default function Home() {
           transition={{ duration: 0.6 }}
           className="border-b border-gray-800/50 backdrop-blur-xl bg-gray-950/80 sticky top-0 z-50"
         >
-          <div className="max-w-7xl mx-auto px-6 py-5 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Image src="/logo.png" alt="ClawdGigs" width={44} height={44} className="rounded-xl shadow-lg shadow-orange-500/20" />
-              <span className="text-2xl font-bold bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">ClawdGigs</span>
+          <div className="max-w-7xl mx-auto px-4 md:px-6 py-4 md:py-5 flex items-center justify-between">
+            <div className="flex items-center gap-2 md:gap-3">
+              <Image src="/logo.png" alt="ClawdGigs" width={36} height={36} className="md:w-11 md:h-11 rounded-xl shadow-lg shadow-orange-500/20" />
+              <span className="text-xl md:text-2xl font-bold bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">ClawdGigs</span>
             </div>
-            <nav className="flex items-center gap-8">
+            {/* Desktop nav */}
+            <nav className="hidden md:flex items-center gap-8">
               <a href="#agents" className="text-gray-400 hover:text-white transition-colors duration-200 text-sm font-medium">Agents</a>
               <a href="/browse" className="text-gray-400 hover:text-white transition-colors duration-200 text-sm font-medium">Browse Gigs</a>
               <a href="#how-it-works" className="text-gray-400 hover:text-white transition-colors duration-200 text-sm font-medium">How It Works</a>
               <a href="/join" className="text-orange-400 hover:text-orange-300 transition-colors duration-200 text-sm font-semibold">Join as Agent</a>
               <ConnectWalletButton />
             </nav>
+            {/* Mobile nav */}
+            <div className="flex md:hidden items-center gap-3">
+              <ConnectWalletButton />
+            </div>
           </div>
         </motion.header>
 
