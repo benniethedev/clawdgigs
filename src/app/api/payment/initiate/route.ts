@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { buildPaymentRequiredHeaders, generateNonce } from '@/lib/x402';
 import { buildUsdcTransferTransaction, USDC_MAINNET } from '@/lib/solana-transfer';
 import { getAgent } from '@/lib/db';
+import { getEscrowWalletPublic } from '@/lib/escrow';
 
-// The wallet address that receives payments (ClawdGigs treasury/escrow)
-const TREASURY_WALLET = process.env.TREASURY_WALLET || '8YLKoCu7NwqHNS8GzuvA2ibsvLrsg22YMfMDafxh1B15';
+// All payments go to escrow wallet - released to seller on accept (minus 10% fee)
+const getEscrowWallet = () => getEscrowWalletPublic();
 
 export async function POST(req: NextRequest) {
   try {
@@ -39,14 +40,8 @@ export async function POST(req: NextRequest) {
         ? `Hire Agent #${agentId}` 
         : 'ClawdGigs Payment';
 
-    // Get agent wallet if paying to agent, otherwise use treasury
-    let recipientWallet = TREASURY_WALLET;
-    if (agentId) {
-      const agent = await getAgent(agentId);
-      if (agent?.wallet_address) {
-        recipientWallet = agent.wallet_address;
-      }
-    }
+    // All payments go to escrow wallet (funds released on delivery accept)
+    const recipientWallet = getEscrowWallet();
 
     // Generate nonce for this payment session
     const nonce = generateNonce();

@@ -1,127 +1,83 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getEscrowsForAutoRelease, releaseEscrow, formatEscrowAmount, getPlatformWallet } from '@/lib/escrow';
-import { updateOrderStatus } from '@/lib/db';
+import { getEscrowsReadyForAutoRelease, releaseEscrow, getEscrow, formatEscrowAmount } from '@/lib/escrow';
+import { updateOrderStatus, getOrder } from '@/lib/db';
 
 /**
  * POST /api/escrow/auto-release
  * 
- * Process auto-release for escrows past their 7-day window
- * Should be called by a cron job
+ * Cron job endpoint to auto-release escrows after 1 day.
+ * Call this from Vercel Cron or external scheduler.
  * 
- * Headers:
- * - X-Cron-Secret: shared secret to authenticate cron calls
+ * Query params:
+ * - key: Simple auth key (CRON_SECRET from env)
  */
 export async function POST(req: NextRequest) {
   try {
-    // Verify cron secret if configured
+    // Simple auth check
     const cronSecret = process.env.CRON_SECRET;
-    if (cronSecret) {
-      const providedSecret = req.headers.get('X-Cron-Secret');
-      if (providedSecret !== cronSecret) {
-        return NextResponse.json(
-          { error: 'Unauthorized' },
-          { status: 401 }
-        );
-      }
-    }
-
-    // Get all escrows due for auto-release
-    const escrowsToRelease = await getEscrowsForAutoRelease();
+    const providedKey = req.nextUrl.searchParams.get('key');
     
-    if (escrowsToRelease.length === 0) {
-      return NextResponse.json({
-        success: true,
-        message: 'No escrows due for auto-release',
-        processed: 0,
-      });
+    if (cronSecret && providedKey !== cronSecret) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const results: Array<{
-      escrowId: string;
-      orderId: string;
-      sellerWallet: string;
-      amount: string;
-      success: boolean;
-      error?: string;
-    }> = [];
+    // Get all escrows ready for auto-release (funded + past auto_release_at)
+    const escrowsToRelease = await getEscrowsReadyForAutoRelease();
+    
+    console.log(`Auto-release check: ${escrowsToRelease.length} escrow(s) ready`);
 
-    // Process each escrow
+    const results = [];
+    
     for (const escrow of escrowsToRelease) {
-      try {
-        // Release the escrow
-        const releaseResult = await releaseEscrow(escrow.id, undefined);
-        
-        if (releaseResult.ok) {
-          // Update order status
-          if (escrow.order_id) {
-            await updateOrderStatus(escrow.order_id, 'completed');
-          }
-          
-          results.push({
-            escrowId: escrow.id,
-            orderId: escrow.order_id,
-            sellerWallet: escrow.seller_wallet,
-            amount: formatEscrowAmount(escrow.seller_amount),
-            success: true,
-          });
-          
-          console.log('Auto-released escrow:', {
-            escrowId: escrow.id,
-            orderId: escrow.order_id,
-            sellerWallet: escrow.seller_wallet,
-            sellerAmount: formatEscrowAmount(escrow.seller_amount),
-            platformFee: formatEscrowAmount(escrow.platform_fee),
-            platformWallet: getPlatformWallet(),
-          });
-        } else {
-          results.push({
-            escrowId: escrow.id,
-            orderId: escrow.order_id,
-            sellerWallet: escrow.seller_wallet,
-            amount: formatEscrowAmount(escrow.seller_amount),
-            success: false,
-            error: releaseResult.error,
-          });
+      console.log(`Auto-releasing escrow ${escrow.id} for order ${escrow.order_id}`);
+      
+      const releaseResult = await releaseEscrow(escrow.id);
+      
+      if (releaseResult.ok) {
+        // Also update the order status to completed
+        const order = await getOrder(escrow.order_id);
+        if (order && order.status === 'delivered') {
+          await updateOrderStatus(escrow.order_id, 'completed');
         }
-      } catch (error) {
+        
         results.push({
           escrowId: escrow.id,
           orderId: escrow.order_id,
+          success: true,
+          txSignature: releaseResult.txSignature,
           sellerWallet: escrow.seller_wallet,
-          amount: formatEscrowAmount(escrow.seller_amount),
-          success: false,
-          error: String(error),
+          sellerAmount: formatEscrowAmount(escrow.seller_amount),
+          platformFee: formatEscrowAmount(escrow.platform_fee),
         });
+        
+        console.log(`Auto-released escrow ${escrow.id}: ${releaseResult.txSignature}`);
+      } else {
+        results.push({
+          escrowId: escrow.id,
+          orderId: escrow.order_id,
+          success: false,
+          error: releaseResult.error,
+        });
+        
+        console.error(`Failed to auto-release escrow ${escrow.id}:`, releaseResult.error);
       }
     }
 
-    const successCount = results.filter(r => r.success).length;
-    const failCount = results.filter(r => !r.success).length;
-
-    console.log('Auto-release batch complete:', {
-      total: escrowsToRelease.length,
-      success: successCount,
-      failed: failCount,
-    });
-
     return NextResponse.json({
       success: true,
-      message: `Auto-released ${successCount} escrow(s)`,
-      processed: escrowsToRelease.length,
-      successCount,
-      failCount,
+      processed: results.length,
       results,
     });
   } catch (error) {
-    console.error('Auto-release check error:', error);
+    console.error('Auto-release cron error:', error);
     return NextResponse.json(
-      { error: 'Failed to process auto-release check' },
+      { error: 'Auto-release failed' },
       { status: 500 }
     );
   }
 }
 
-// Also support GET for manual testing
+// Also allow GET for easy testing
 export async function GET(req: NextRequest) {
   return POST(req);
 }

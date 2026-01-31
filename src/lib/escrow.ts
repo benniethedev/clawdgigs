@@ -1,14 +1,16 @@
 // Custom Escrow System for ClawdGigs
 // Uses PressBase for storage, handles all escrow logic internally
+// Real fund custody - escrow wallet holds USDC until release
+
+import { transferFromEscrow, refundFromEscrow, getEscrowWalletPublic, getPlatformWallet as getWallet } from './escrow-transfer';
 
 const API_BASE = 'https://backend.benbond.dev/wp-json/app/v1/db';
 
 // Platform fee configuration
 const PLATFORM_FEE_PERCENT = 10; // 10% platform fee
-const PLATFORM_WALLET = '2BcjnU1sSv2f4Uk793ZY59U41LapKMggYmwhiPDrhHfs'; // 0xRob wallet
 
-// Auto-release after 7 days (in milliseconds)
-const AUTO_RELEASE_DAYS = 7;
+// Auto-release after 1 day (in milliseconds) - MVP simple logic
+const AUTO_RELEASE_DAYS = 1;
 const AUTO_RELEASE_MS = AUTO_RELEASE_DAYS * 24 * 60 * 60 * 1000;
 
 export type EscrowStatus = 
@@ -155,6 +157,7 @@ export async function getEscrowByOrder(orderId: string): Promise<Escrow | null> 
 }
 
 // Get all escrows due for auto-release
+// Alias: getEscrowsReadyForAutoRelease
 export async function getEscrowsForAutoRelease(): Promise<Escrow[]> {
   // Get all funded escrows
   const result = await escrowDbRequest({ where: `status:eq:funded` });
@@ -209,10 +212,11 @@ export async function markEscrowFunded(
 }
 
 // Release escrow to agent (client approves delivery)
+// Actually transfers USDC: 90% to seller, 10% to platform
 export async function releaseEscrow(
   escrowId: string,
   releaseTxSignature?: string
-): Promise<{ ok: boolean; escrow?: Escrow; error?: string }> {
+): Promise<{ ok: boolean; escrow?: Escrow; txSignature?: string; error?: string }> {
   const escrow = await getEscrow(escrowId);
   if (!escrow) {
     return { ok: false, error: 'Escrow not found' };
@@ -222,24 +226,38 @@ export async function releaseEscrow(
     return { ok: false, error: `Cannot release escrow in ${escrow.status} status` };
   }
 
+  // Actually transfer funds on-chain
+  const transferResult = await transferFromEscrow({
+    sellerWallet: escrow.seller_wallet,
+    sellerAmount: escrow.seller_amount,
+    platformFee: escrow.platform_fee,
+  });
+
+  if (!transferResult.success) {
+    console.error('Escrow release transfer failed:', transferResult.error);
+    return { ok: false, error: `Transfer failed: ${transferResult.error}` };
+  }
+
+  // Update escrow status in database
   const result = await updateEscrow(escrowId, {
     status: 'released',
-    release_tx_signature: releaseTxSignature || null,
+    release_tx_signature: transferResult.txSignature || releaseTxSignature || null,
     released_at: new Date().toISOString(),
   });
 
   if (result.ok) {
     const updatedEscrow = await getEscrow(escrowId);
-    return { ok: true, escrow: updatedEscrow || undefined };
+    return { ok: true, escrow: updatedEscrow || undefined, txSignature: transferResult.txSignature };
   }
   return { ok: false, error: result.error };
 }
 
 // Refund escrow to buyer
+// Actually transfers full amount back to buyer (no fee on refunds)
 export async function refundEscrow(
   escrowId: string,
   refundTxSignature?: string
-): Promise<{ ok: boolean; escrow?: Escrow; error?: string }> {
+): Promise<{ ok: boolean; escrow?: Escrow; txSignature?: string; error?: string }> {
   const escrow = await getEscrow(escrowId);
   if (!escrow) {
     return { ok: false, error: 'Escrow not found' };
@@ -250,15 +268,23 @@ export async function refundEscrow(
     return { ok: false, error: `Cannot refund escrow in ${escrow.status} status` };
   }
 
+  // Actually transfer funds back to buyer
+  const transferResult = await refundFromEscrow(escrow.buyer_wallet, escrow.amount);
+
+  if (!transferResult.success) {
+    console.error('Escrow refund transfer failed:', transferResult.error);
+    return { ok: false, error: `Refund transfer failed: ${transferResult.error}` };
+  }
+
   const result = await updateEscrow(escrowId, {
     status: 'refunded',
-    release_tx_signature: refundTxSignature || null,
+    release_tx_signature: transferResult.txSignature || refundTxSignature || null,
     released_at: new Date().toISOString(),
   });
 
   if (result.ok) {
     const updatedEscrow = await getEscrow(escrowId);
-    return { ok: true, escrow: updatedEscrow || undefined };
+    return { ok: true, escrow: updatedEscrow || undefined, txSignature: transferResult.txSignature };
   }
   return { ok: false, error: result.error };
 }
@@ -343,10 +369,13 @@ export async function cancelEscrow(escrowId: string): Promise<{ ok: boolean; err
   return updateEscrow(escrowId, { status: 'cancelled' });
 }
 
-// Get platform wallet address
+// Get platform wallet address (from env or default)
 export function getPlatformWallet(): string {
-  return PLATFORM_WALLET;
+  return getWallet();
 }
+
+// Get escrow wallet address (where payments should be sent)
+export { getEscrowWalletPublic };
 
 // Get platform fee percentage
 export function getPlatformFeePercent(): number {
@@ -441,3 +470,6 @@ export function getAutoReleaseTimeRemaining(escrow: Escrow): {
 
   return { days, hours, expired: false, formattedString };
 }
+
+// Alias for auto-release function
+export { getEscrowsForAutoRelease as getEscrowsReadyForAutoRelease };
