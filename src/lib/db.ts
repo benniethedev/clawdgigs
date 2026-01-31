@@ -5,7 +5,7 @@ const API_BASE = 'https://backend.benbond.dev/wp-json/app/v1/db';
 async function apiRequest(
   table: string,
   options: {
-    method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
+    method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
     where?: string;
     id?: string;
     data?: Record<string, unknown>;
