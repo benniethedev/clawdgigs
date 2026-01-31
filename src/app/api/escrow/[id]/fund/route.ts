@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getEscrow, markEscrowFunded } from '@/lib/escrow';
 import { updateOrderStatus } from '@/lib/db';
+import { verifyTransaction } from '@/lib/solana';
 
 /**
  * POST /api/escrow/[id]/fund
@@ -42,7 +43,37 @@ export async function POST(
       );
     }
 
-    // Mark escrow as funded
+    // CRITICAL: Verify the transaction on-chain before marking as funded
+    console.log('Verifying transaction on-chain:', fundingTxSignature.slice(0, 20) + '...');
+    
+    const txVerification = await verifyTransaction(fundingTxSignature);
+    
+    if (!txVerification) {
+      console.error('Transaction not found on-chain:', fundingTxSignature);
+      return NextResponse.json(
+        { error: 'Transaction not found on-chain. Please wait for confirmation and try again.' },
+        { status: 400 }
+      );
+    }
+
+    if (!txVerification.confirmed) {
+      console.error('Transaction failed on-chain:', {
+        signature: fundingTxSignature,
+        error: txVerification.err,
+      });
+      return NextResponse.json(
+        { error: 'Transaction failed on-chain. Payment was not successful.' },
+        { status: 400 }
+      );
+    }
+
+    console.log('Transaction verified on-chain:', {
+      signature: fundingTxSignature.slice(0, 20) + '...',
+      slot: txVerification.slot,
+      blockTime: txVerification.blockTime,
+    });
+
+    // Mark escrow as funded (transaction verified)
     const result = await markEscrowFunded(escrowId, fundingTxSignature);
     if (!result.ok) {
       return NextResponse.json(
@@ -59,10 +90,12 @@ export async function POST(
     // Get updated escrow
     const updatedEscrow = await getEscrow(escrowId);
 
-    console.log('Escrow funded:', {
+    console.log('Escrow funded (verified on-chain):', {
       escrowId,
       orderId: escrow.order_id,
       fundingTxSignature: fundingTxSignature.slice(0, 20) + '...',
+      verifiedSlot: txVerification.slot,
+      verifiedBlockTime: txVerification.blockTime,
       autoReleaseAt: updatedEscrow?.auto_release_at,
     });
 

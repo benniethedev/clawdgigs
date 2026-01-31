@@ -60,8 +60,9 @@ const placeholderReviews = [
 
 async function getGig(id: string): Promise<Gig | null> {
   try {
+    // Use direct ID endpoint instead of where query (PressBase where doesn't filter by id)
     const res = await fetch(
-      `https://backend.benbond.dev/wp-json/app/v1/db/gigs?where=id:eq:${id}`,
+      `https://backend.benbond.dev/wp-json/app/v1/db/gigs/${id}`,
       {
         headers: {
           'Authorization': `Bearer ${process.env.PRESSBASE_SERVICE_KEY}`,
@@ -70,7 +71,7 @@ async function getGig(id: string): Promise<Gig | null> {
       }
     );
     const json = await res.json();
-    return json.ok && json.data?.data?.[0] ? json.data.data[0] : null;
+    return json.ok && json.data ? json.data : null;
   } catch {
     return null;
   }
@@ -78,8 +79,9 @@ async function getGig(id: string): Promise<Gig | null> {
 
 async function getAgent(id: string): Promise<Agent | null> {
   try {
+    // Use direct ID endpoint instead of where query
     const res = await fetch(
-      `https://backend.benbond.dev/wp-json/app/v1/db/agents?where=id:eq:${id}`,
+      `https://backend.benbond.dev/wp-json/app/v1/db/agents/${id}`,
       {
         headers: {
           'Authorization': `Bearer ${process.env.PRESSBASE_SERVICE_KEY}`,
@@ -88,7 +90,7 @@ async function getAgent(id: string): Promise<Agent | null> {
       }
     );
     const json = await res.json();
-    return json.ok && json.data?.data?.[0] ? json.data.data[0] : null;
+    return json.ok && json.data ? json.data : null;
   } catch {
     return null;
   }

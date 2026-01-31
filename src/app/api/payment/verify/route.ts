@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Verify with x402 facilitator
+    // Step 1: Verify with x402 facilitator
     const verifyRes = await fetch(`${X402_FACILITATOR}/verify`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -61,25 +61,56 @@ export async function POST(req: NextRequest) {
 
     let paymentVerified = false;
     let verifyData = null;
+    let settlementTx: string | null = null;
 
     if (verifyRes.ok) {
       verifyData = await verifyRes.json();
-      paymentVerified = true;
+      
+      // Step 2: Settle the payment (actually transfer USDC on-chain)
+      const settleRes = await fetch(`${X402_FACILITATOR}/settle`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          payment: payment.payload,
+          network: payment.network,
+          scheme: payment.scheme,
+        }),
+      });
+
+      if (settleRes.ok) {
+        const settleData = await settleRes.json();
+        if (settleData.txSignature || settleData.signature) {
+          paymentVerified = true;
+          settlementTx = settleData.txSignature || settleData.signature;
+          console.log('Payment settled on-chain:', settlementTx);
+        } else {
+          console.error('Settlement response missing txSignature:', settleData);
+        }
+      } else {
+        const settleError = await settleRes.text();
+        console.error('Settlement failed:', settleError);
+      }
+    } else {
+      const verifyError = await verifyRes.text();
+      console.error('Payment verification failed:', verifyError);
     }
 
-    // For demo mode: accept signed messages as proof of intent
-    // In production, you'd require strict verification
-    if (!paymentVerified && paymentSignature && payerWallet) {
-      paymentVerified = true;
-      console.log('Payment accepted (demo mode - signature present)');
-    }
+    // Demo mode: DISABLED for production
+    // Uncomment below for testing without real payments
+    // if (!paymentVerified && paymentSignature && payerWallet) {
+    //   paymentVerified = true;
+    //   console.log('Payment accepted (demo mode - signature present)');
+    // }
 
     if (!paymentVerified) {
       return NextResponse.json(
-        { error: 'Payment verification failed', success: false },
+        { error: 'Payment verification or settlement failed. Your wallet was not charged.', success: false },
         { status: 402 }
       );
     }
+
+    // Use the settlement transaction signature for tracking
+    const finalTxSignature = settlementTx || paymentSignature;
 
     // Get agent info for escrow
     const agent = await getAgent(agentId);
@@ -102,7 +133,7 @@ export async function POST(req: NextRequest) {
       requirements_description: orderRequirements.description,
       requirements_inputs: orderRequirements.inputs || undefined,
       requirements_delivery_prefs: orderRequirements.deliveryPreferences || undefined,
-      payment_signature: paymentSignature ? paymentSignature.slice(0, 88) : undefined,
+      payment_signature: finalTxSignature ? finalTxSignature.slice(0, 88) : undefined,
       buyer_email: orderRequirements.email || undefined,
     });
 
@@ -112,7 +143,7 @@ export async function POST(req: NextRequest) {
         success: true,
         warning: 'Payment verified but order creation failed - please contact support',
         message: 'Payment verified successfully',
-        txSignature: paymentSignature?.slice(0, 44) || 'demo-sig',
+        txSignature: finalTxSignature?.slice(0, 44) || 'unknown',
         gigId,
         agentId,
       });
@@ -138,10 +169,10 @@ export async function POST(req: NextRequest) {
       // Link escrow to order
       await updateOrderEscrow(orderId, escrowId);
       
-      // Mark escrow as funded (payment already verified)
+      // Mark escrow as funded with the real on-chain transaction
       const fundResult = await markEscrowFunded(
         escrowId,
-        paymentSignature || 'demo-tx-sig',
+        finalTxSignature || 'settlement-tx',
       );
       
       if (fundResult.ok) {
@@ -180,7 +211,7 @@ export async function POST(req: NextRequest) {
         requirementsDescription: orderRequirements.description,
         requirementsInputs: orderRequirements.inputs,
         requirementsDeliveryPrefs: orderRequirements.deliveryPreferences,
-        paymentSignature: paymentSignature?.slice(0, 88),
+        paymentSignature: finalTxSignature?.slice(0, 88),
         escrowId,
       }).then(result => {
         if (result.success) {
@@ -218,12 +249,13 @@ export async function POST(req: NextRequest) {
       message: escrowId 
         ? 'Payment verified and secured in escrow' 
         : 'Payment verified and order created',
-      txSignature: paymentSignature?.slice(0, 44) || 'demo-sig',
+      txSignature: finalTxSignature?.slice(0, 44) || 'settlement-tx',
       orderId,
       escrowId,
       escrowError,
       gigId,
       agentId,
+      settlementTx,
     });
 
   } catch (error) {
