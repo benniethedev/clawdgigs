@@ -42,6 +42,7 @@ export async function POST(req: NextRequest) {
 
     // All payments go to escrow wallet (funds released on delivery accept)
     const recipientWallet = getEscrowWallet();
+    console.log('Payment initiate - escrow wallet:', recipientWallet, 'length:', recipientWallet?.length);
 
     // Generate nonce for this payment session
     const nonce = generateNonce();
@@ -58,8 +59,9 @@ export async function POST(req: NextRequest) {
       transaction = result.serializedTx;
     } catch (txError) {
       console.error('Failed to build transaction:', txError);
+      console.error('Payer:', payer, 'Recipient:', recipientWallet, 'Amount:', numericAmount);
       return NextResponse.json(
-        { error: 'Failed to build payment transaction', details: String(txError) },
+        { error: 'Failed to build payment transaction', details: String(txError), recipient: recipientWallet, payer },
         { status: 500 }
       );
     }
