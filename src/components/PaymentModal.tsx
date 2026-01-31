@@ -164,7 +164,7 @@ export function PaymentModal({
       }
 
       // Success!
-      setTxSignature(verifyData.txSignature || signatureBase64.slice(0, 16) + '...');
+      setTxSignature(verifyData.txSignature || 'settled');
       setOrderId(verifyData.orderId || null);
       setStatus('success');
 
