@@ -2,6 +2,25 @@ import { NextRequest, NextResponse } from 'next/server';
 
 const API_BASE = 'https://backend.benbond.dev/wp-json/app/v1/db';
 
+interface FileRecord {
+  id: string;
+  filename: string;
+  content_type: string;
+  size: number;
+  data: string; // base64 encoded file data
+  created_at: string;
+}
+
+// Helper to flatten PressBase schemaless records
+function flattenRecord(record: Record<string, unknown> | null): FileRecord | null {
+  if (!record) return null;
+  if (record.data && typeof record.data === 'object' && !Array.isArray(record.data)) {
+    const { data, ...topLevel } = record;
+    return { ...topLevel, ...(data as Record<string, unknown>) } as unknown as FileRecord;
+  }
+  return record as unknown as FileRecord;
+}
+
 // GET /api/files/[id] - Download a file
 export async function GET(
   req: NextRequest,
@@ -27,7 +46,16 @@ export async function GET(
       );
     }
 
-    const file = result.data.data[0];
+    const rawRecord = result.data.data[0];
+    const file = flattenRecord(rawRecord);
+
+    if (!file || !file.data) {
+      return NextResponse.json(
+        { error: 'File data not found' },
+        { status: 404 }
+      );
+    }
+
     const buffer = Buffer.from(file.data, 'base64');
 
     return new NextResponse(buffer, {
