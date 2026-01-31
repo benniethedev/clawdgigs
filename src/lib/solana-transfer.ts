@@ -18,6 +18,10 @@ import {
 export const USDC_MAINNET = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
 export const USDC_DEVNET = '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU';
 
+// x402 Facilitator fee payer (sponsors transaction fees)
+// This allows users to pay with only USDC, no SOL required
+export const FACILITATOR_FEE_PAYER = '86Ts3pgt61316eCC8RR1bHoCgtLdt6BD3imrWXALWKtp';
+
 // RPC endpoints
 const MAINNET_RPC = 'https://api.mainnet-beta.solana.com';
 const DEVNET_RPC = 'https://api.devnet.solana.com';
@@ -92,11 +96,14 @@ export async function buildUsdcTransferTransaction({
     )
   );
   
-  // Build transaction
+  // Build transaction with x402 facilitator as fee payer (gasless for users)
   const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
   
+  // Use facilitator as fee payer so users don't need SOL
+  const facilitatorPubkey = new PublicKey(FACILITATOR_FEE_PAYER);
+  
   const transaction = new Transaction({
-    feePayer: payerPubkey,
+    feePayer: facilitatorPubkey,  // Facilitator sponsors the fee
     blockhash,
     lastValidBlockHeight,
   });
