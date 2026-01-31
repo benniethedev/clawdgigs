@@ -28,7 +28,7 @@ export function PaymentModal({
   gigId,
   agentId 
 }: PaymentModalProps) {
-  const { connected, publicKey, connect, connecting, signMessage, walletType } = useWallet();
+  const { connected, publicKey, connect, connecting, signMessage, signTransaction, walletType } = useWallet();
   // Start at 'wallet' step if not connected, otherwise skip to 'requirements'
   const [step, setStep] = useState<ModalStep>(connected ? 'requirements' : 'wallet');
   const [orderRequirements, setOrderRequirements] = useState<OrderRequirements | null>(null);
@@ -90,7 +90,7 @@ export function PaymentModal({
         return; // Will re-render with connected state
       }
 
-      // Step 2: Request payment requirements from our API
+      // Step 2: Request payment requirements and unsigned transaction from our API
       setStatus('signing');
       const requirementRes = await fetch('/api/payment/initiate', {
         method: 'POST',
@@ -105,58 +105,54 @@ export function PaymentModal({
       });
 
       if (requirementRes.status !== 402) {
-        throw new Error('Unexpected response from payment API');
+        const errorData = await requirementRes.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Unexpected response from payment API');
       }
 
-      const paymentRequired = requirementRes.headers.get('X-Payment-Required');
-      if (!paymentRequired) {
-        throw new Error('No payment requirements received');
-      }
-
-      const requirements = JSON.parse(paymentRequired);
-      const requirement = requirements[0];
-
-      // Step 3: Create and sign the payment message
-      const nonce = crypto.randomUUID().replace(/-/g, '');
-      const paymentPayload = {
-        payTo: requirement.payTo,
-        asset: requirement.asset,
-        amountRequired: requirement.maxAmountRequired,
-        nonce,
-        payer: publicKey,
-      };
-
-      const messageToSign = JSON.stringify(paymentPayload);
-      const encodedMessage = new TextEncoder().encode(messageToSign);
-      const signature = await signMessage(encodedMessage);
+      const paymentData = await requirementRes.json();
+      const { paymentRequirements, unsignedTransaction, nonce, recipient } = paymentData;
       
-      // Convert signature to base64
-      const signatureBase64 = btoa(String.fromCharCode(...signature));
+      if (!unsignedTransaction) {
+        throw new Error('No transaction received from server');
+      }
 
-      // Step 4: Create the x402 payment header
-      const paymentHeader = {
-        x402Version: 1,
-        scheme: 'exact',
-        network: requirement.network,
-        payload: {
-          signature: signatureBase64,
-          payload: paymentPayload,
+      // Step 3: Deserialize and sign the transaction
+      // Import Transaction from @solana/web3.js dynamically to avoid SSR issues
+      const { Transaction } = await import('@solana/web3.js');
+      const txBuffer = Uint8Array.from(atob(unsignedTransaction), c => c.charCodeAt(0));
+      const transaction = Transaction.from(txBuffer);
+      
+      // Sign the transaction using the wallet
+      const signedTx = await signTransaction(transaction);
+      
+      // Serialize the signed transaction
+      const signedTxBase64 = btoa(
+        String.fromCharCode(...signedTx.serialize())
+      );
+
+      // Step 4: Create the x402 v2 payment payload
+      const x402Payload = {
+        paymentRequirements,
+        paymentPayload: {
+          signedTransactionB64: signedTxBase64,
+          selectedAcceptIndex: 0,
         },
       };
 
-      // Step 5: Submit payment for verification
+      // Step 5: Submit payment for verification and settlement
       setStatus('verifying');
       const verifyRes = await fetch('/api/payment/verify', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Payment': JSON.stringify(paymentHeader),
         },
         body: JSON.stringify({
           gigId,
           agentId,
           amount,
           orderRequirements,
+          x402Payload,
+          nonce,
         }),
       });
 

@@ -7,17 +7,8 @@ import { sendOrderConfirmedEmail } from '@/lib/email';
 
 export async function POST(req: NextRequest) {
   try {
-    const paymentHeader = req.headers.get('X-Payment');
-    
-    if (!paymentHeader) {
-      return NextResponse.json(
-        { error: 'Missing payment header' },
-        { status: 400 }
-      );
-    }
-
     const body = await req.json();
-    const { gigId, agentId, amount, orderRequirements } = body;
+    const { gigId, agentId, amount, orderRequirements, x402Payload, nonce } = body;
 
     // Validate order requirements
     if (!orderRequirements?.description) {
@@ -27,90 +18,86 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Parse the payment header
-    let payment;
-    try {
-      payment = JSON.parse(paymentHeader);
-    } catch {
+    // Validate x402 payload
+    if (!x402Payload?.paymentPayload?.signedTransactionB64) {
       return NextResponse.json(
-        { error: 'Invalid payment header format' },
+        { error: 'Missing signed transaction' },
         { status: 400 }
       );
     }
 
-    const payerWallet = payment.payload?.payload?.payer;
-    const paymentSignature = payment.payload?.signature;
-
-    if (!payerWallet) {
-      return NextResponse.json(
-        { error: 'Missing payer wallet in payment' },
-        { status: 400 }
-      );
-    }
+    // Extract payer from payment requirements
+    const payerWallet = x402Payload.paymentRequirements?.accepts?.[0]?.extra?.payer || 
+                        orderRequirements.payer || 
+                        'unknown';
 
     // Step 1: Verify with x402 facilitator
+    console.log('Verifying payment with x402 facilitator...');
     const verifyRes = await fetch(`${X402_FACILITATOR}/verify`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        payment: payment.payload,
-        network: payment.network,
-        scheme: payment.scheme,
-      }),
+      body: JSON.stringify(x402Payload),
     });
 
-    let paymentVerified = false;
     let verifyData = null;
-    let settlementTx: string | null = null;
-
     if (verifyRes.ok) {
       verifyData = await verifyRes.json();
+      console.log('Verification response:', verifyData);
       
-      // Step 2: Settle the payment (actually transfer USDC on-chain)
-      const settleRes = await fetch(`${X402_FACILITATOR}/settle`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          payment: payment.payload,
-          network: payment.network,
-          scheme: payment.scheme,
-        }),
-      });
-
-      if (settleRes.ok) {
-        const settleData = await settleRes.json();
-        if (settleData.txSignature || settleData.signature) {
-          paymentVerified = true;
-          settlementTx = settleData.txSignature || settleData.signature;
-          console.log('Payment settled on-chain:', settlementTx);
-        } else {
-          console.error('Settlement response missing txSignature:', settleData);
-        }
-      } else {
-        const settleError = await settleRes.text();
-        console.error('Settlement failed:', settleError);
+      if (!verifyData.isValid) {
+        return NextResponse.json(
+          { error: 'Payment verification failed', reason: verifyData.reason, success: false },
+          { status: 402 }
+        );
       }
     } else {
       const verifyError = await verifyRes.text();
-      console.error('Payment verification failed:', verifyError);
-    }
-
-    // Demo mode: DISABLED for production
-    // Uncomment below for testing without real payments
-    // if (!paymentVerified && paymentSignature && payerWallet) {
-    //   paymentVerified = true;
-    //   console.log('Payment accepted (demo mode - signature present)');
-    // }
-
-    if (!paymentVerified) {
+      console.error('Verification failed:', verifyError);
       return NextResponse.json(
-        { error: 'Payment verification or settlement failed. Your wallet was not charged.', success: false },
+        { error: 'Payment verification failed', details: verifyError, success: false },
         { status: 402 }
       );
     }
 
-    // Use the settlement transaction signature for tracking
-    const finalTxSignature = settlementTx || paymentSignature;
+    // Step 2: Settle the payment (submit transaction on-chain)
+    console.log('Settling payment with x402 facilitator...');
+    const settleRes = await fetch(`${X402_FACILITATOR}/settle`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(x402Payload),
+    });
+
+    let settlementTx: string | null = null;
+    let settleData = null;
+
+    if (settleRes.ok) {
+      settleData = await settleRes.json();
+      console.log('Settlement response:', settleData);
+      
+      if (settleData.settled && settleData.txId) {
+        settlementTx = settleData.txId;
+        console.log('Payment settled on-chain:', settlementTx);
+      } else if (settleData.alreadySettled && settleData.txId) {
+        settlementTx = settleData.txId;
+        console.log('Payment was already settled:', settlementTx);
+      } else {
+        console.error('Settlement did not return txId:', settleData);
+        return NextResponse.json(
+          { error: 'Settlement failed - no transaction ID', details: settleData, success: false },
+          { status: 402 }
+        );
+      }
+    } else {
+      const settleError = await settleRes.text();
+      console.error('Settlement failed:', settleError);
+      return NextResponse.json(
+        { error: 'Payment settlement failed', details: settleError, success: false },
+        { status: 402 }
+      );
+    }
+
+    // Get the actual payer from verification response
+    const actualPayer = verifyData?.payer || settleData?.receipt?.payer || payerWallet;
 
     // Get agent info for escrow
     const agent = await getAgent(agentId);
@@ -123,18 +110,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Create the order first (status 'paid')
+    // Create the order with confirmed payment
     const orderResult = await createOrder({
       gig_id: gigId,
       agent_id: agentId,
-      client_wallet: payerWallet,
+      client_wallet: actualPayer,
       amount_usdc: amount.toString(),
       status: 'paid',
       requirements_description: orderRequirements.description,
       requirements_inputs: orderRequirements.inputs || undefined,
       requirements_delivery_prefs: orderRequirements.deliveryPreferences || undefined,
-      requirements_file_urls: orderRequirements.files ? JSON.stringify(orderRequirements.files) : undefined,
-      payment_signature: finalTxSignature ? finalTxSignature.slice(0, 88) : undefined,
+      payment_signature: settlementTx || undefined,
       buyer_email: orderRequirements.email || undefined,
     });
 
@@ -142,9 +128,9 @@ export async function POST(req: NextRequest) {
       console.error('Failed to create order:', orderResult.error);
       return NextResponse.json({
         success: true,
-        warning: 'Payment verified but order creation failed - please contact support',
-        message: 'Payment verified successfully',
-        txSignature: finalTxSignature?.slice(0, 44) || 'unknown',
+        warning: 'Payment settled but order creation failed - please contact support',
+        message: 'Payment settled successfully',
+        txSignature: settlementTx,
         gigId,
         agentId,
       });
@@ -158,7 +144,7 @@ export async function POST(req: NextRequest) {
 
     const escrowResult = await createEscrow({
       orderId,
-      clientWallet: payerWallet,
+      clientWallet: actualPayer,
       agentWallet: agent.wallet_address,
       amountUsdc: amount.toString(),
       description: gig?.title ? `${gig.title} - Order ${orderId.slice(0, 8)}` : undefined,
@@ -171,10 +157,7 @@ export async function POST(req: NextRequest) {
       await updateOrderEscrow(orderId, escrowId);
       
       // Mark escrow as funded with the real on-chain transaction
-      const fundResult = await markEscrowFunded(
-        escrowId,
-        finalTxSignature || 'settlement-tx',
-      );
+      const fundResult = await markEscrowFunded(escrowId, settlementTx || 'on-chain-tx');
       
       if (fundResult.ok) {
         console.log('Escrow created and funded:', escrowId);
@@ -185,42 +168,32 @@ export async function POST(req: NextRequest) {
     } else {
       console.warn('Failed to create escrow:', escrowResult.error);
       escrowError = escrowResult.error;
-      // Continue without escrow - payment still valid
-      // In production, you might want to fail the whole transaction
     }
 
-    console.log('Payment verified and order created:', {
+    console.log('Payment verified, settled, and order created:', {
       gigId,
       agentId,
       amount,
-      payer: payerWallet,
+      payer: actualPayer,
       orderId,
       escrowId,
-      verified: verifyData,
+      txSignature: settlementTx,
     });
 
     // Send webhook notification to agent (fire and forget)
-    if (agent?.webhook_url && orderResult.data) {
-      // Don't await - let it run in background with its own retry logic
-      notifyAgentOfOrder(agent.webhook_url, {
+    if (agent && orderResult.data) {
+      notifyAgentOfOrder(agent.webhook_url || '', {
         orderId,
         gigId,
         gigTitle: gig?.title || 'Unknown Gig',
         agentId,
-        clientWallet: payerWallet,
+        clientWallet: actualPayer,
         amountUsdc: amount.toString(),
         requirementsDescription: orderRequirements.description,
         requirementsInputs: orderRequirements.inputs,
         requirementsDeliveryPrefs: orderRequirements.deliveryPreferences,
-        requirementsFileUrls: orderRequirements.files,
-        paymentSignature: finalTxSignature?.slice(0, 88),
+        paymentSignature: settlementTx || undefined,
         escrowId,
-      }).then(result => {
-        if (result.success) {
-          console.log(`Webhook delivered to agent ${agentId}`, { attempts: result.attempts });
-        } else {
-          console.error(`Webhook failed for agent ${agentId}:`, result.error);
-        }
       }).catch(err => {
         console.error(`Webhook error for agent ${agentId}:`, err);
       });
@@ -235,12 +208,6 @@ export async function POST(req: NextRequest) {
         agentName: agent?.display_name || agent?.name || 'AI Agent',
         amountUsdc: amount.toString(),
         requirementsDescription: orderRequirements.description,
-      }).then(result => {
-        if (result.success) {
-          console.log(`Order confirmation email sent to ${orderRequirements.email}`);
-        } else {
-          console.warn(`Failed to send order confirmation email:`, result.error);
-        }
       }).catch(err => {
         console.error(`Error sending order confirmation email:`, err);
       });
@@ -248,22 +215,20 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: escrowId 
-        ? 'Payment verified and secured in escrow' 
-        : 'Payment verified and order created',
-      txSignature: finalTxSignature?.slice(0, 44) || 'settlement-tx',
+      message: 'Payment settled and secured in escrow',
+      txSignature: settlementTx,
       orderId,
       escrowId,
       escrowError,
       gigId,
       agentId,
-      settlementTx,
+      receipt: settleData?.receipt,
     });
 
   } catch (error) {
     console.error('Payment verification error:', error);
     return NextResponse.json(
-      { error: 'Failed to verify payment', success: false },
+      { error: 'Failed to verify payment', details: String(error), success: false },
       { status: 500 }
     );
   }

@@ -1,0 +1,124 @@
+// Solana USDC transfer utilities for x402 payments
+import {
+  Connection,
+  PublicKey,
+  Transaction,
+  SystemProgram,
+  TransactionInstruction,
+} from '@solana/web3.js';
+import {
+  getAssociatedTokenAddress,
+  createTransferInstruction,
+  createAssociatedTokenAccountInstruction,
+  TOKEN_PROGRAM_ID,
+  ASSOCIATED_TOKEN_PROGRAM_ID,
+} from '@solana/spl-token';
+
+// USDC mint addresses
+export const USDC_MAINNET = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
+export const USDC_DEVNET = '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU';
+
+// RPC endpoints
+const MAINNET_RPC = 'https://api.mainnet-beta.solana.com';
+const DEVNET_RPC = 'https://api.devnet.solana.com';
+
+export interface BuildTransferParams {
+  payer: string;        // Payer's wallet address
+  recipient: string;    // Recipient's wallet address
+  amountUsdc: number;   // Amount in USDC (e.g., 0.10)
+  network?: 'mainnet' | 'devnet';
+}
+
+export interface TransferResult {
+  transaction: Transaction;
+  serializedTx: string; // Base64 encoded for signing
+}
+
+/**
+ * Build a USDC transfer transaction for x402 payment.
+ * Returns a transaction ready to be signed by the payer.
+ */
+export async function buildUsdcTransferTransaction({
+  payer,
+  recipient,
+  amountUsdc,
+  network = 'mainnet',
+}: BuildTransferParams): Promise<TransferResult> {
+  const rpc = network === 'mainnet' ? MAINNET_RPC : DEVNET_RPC;
+  const usdcMint = network === 'mainnet' ? USDC_MAINNET : USDC_DEVNET;
+  
+  const connection = new Connection(rpc, 'confirmed');
+  
+  const payerPubkey = new PublicKey(payer);
+  const recipientPubkey = new PublicKey(recipient);
+  const mintPubkey = new PublicKey(usdcMint);
+  
+  // Convert USDC amount to smallest unit (6 decimals)
+  const amountInSmallestUnit = Math.round(amountUsdc * 1_000_000);
+  
+  // Get associated token accounts
+  const payerAta = await getAssociatedTokenAddress(
+    mintPubkey,
+    payerPubkey
+  );
+  
+  const recipientAta = await getAssociatedTokenAddress(
+    mintPubkey,
+    recipientPubkey
+  );
+  
+  const instructions: TransactionInstruction[] = [];
+  
+  // Check if recipient ATA exists, if not add create instruction
+  const recipientAtaInfo = await connection.getAccountInfo(recipientAta);
+  if (!recipientAtaInfo) {
+    instructions.push(
+      createAssociatedTokenAccountInstruction(
+        payerPubkey,         // payer
+        recipientAta,        // associatedToken
+        recipientPubkey,     // owner
+        mintPubkey           // mint
+      )
+    );
+  }
+  
+  // Add transfer instruction
+  instructions.push(
+    createTransferInstruction(
+      payerAta,              // source
+      recipientAta,          // destination
+      payerPubkey,           // owner
+      amountInSmallestUnit   // amount
+    )
+  );
+  
+  // Build transaction
+  const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
+  
+  const transaction = new Transaction({
+    feePayer: payerPubkey,
+    blockhash,
+    lastValidBlockHeight,
+  });
+  
+  transaction.add(...instructions);
+  
+  // Serialize for client-side signing
+  const serializedTx = transaction.serialize({
+    requireAllSignatures: false,
+    verifySignatures: false,
+  }).toString('base64');
+  
+  return {
+    transaction,
+    serializedTx,
+  };
+}
+
+/**
+ * Deserialize a base64 transaction
+ */
+export function deserializeTransaction(base64Tx: string): Transaction {
+  const buffer = Buffer.from(base64Tx, 'base64');
+  return Transaction.from(buffer);
+}
