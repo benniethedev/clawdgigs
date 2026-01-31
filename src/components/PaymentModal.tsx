@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import { useWallet } from './WalletProvider';
 import { OrderRequirementsForm, OrderRequirements } from './OrderRequirementsForm';
 import { Check, X, Zap, Wallet, Lock } from 'lucide-react';
+import type { Transaction } from '@solana/web3.js';
 
 interface PaymentModalProps {
   isOpen: boolean;
@@ -123,7 +124,7 @@ export function PaymentModal({
       const transaction = Transaction.from(txBuffer);
       
       // Sign the transaction using the wallet
-      const signedTx = await signTransaction(transaction);
+      const signedTx = await signTransaction(transaction) as Transaction;
       
       // Serialize the signed transaction
       const signedTxBase64 = btoa(
