@@ -188,10 +188,11 @@ export async function getOrderWithDelivery(orderId: string): Promise<{ order: Or
 
 // Gig info helper
 export async function getGig(id: string): Promise<{ id: string; title: string; description: string; agent_id: string; price_usdc: string } | null> {
-  const result = await apiRequest('gigs', { where: `id:eq:${id}` });
+  // Workaround: Pressbase where=id:eq:X returns wrong results, so fetch all and filter
+  const result = await apiRequest('gigs', {});
   if (result.ok && result.data) {
     const data = result.data as { data?: { id: string; title: string; description: string; agent_id: string; price_usdc: string }[] };
-    return data.data?.[0] || null;
+    return data.data?.find(g => g.id === id) || null;
   }
   return null;
 }
