@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useWallet } from './WalletProvider';
 import { OrderRequirementsForm, OrderRequirements } from './OrderRequirementsForm';
 import { Check, X, Zap, Wallet, Lock } from 'lucide-react';
@@ -15,7 +15,7 @@ interface PaymentModalProps {
   agentId?: string;
 }
 
-type ModalStep = 'requirements' | 'payment';
+type ModalStep = 'wallet' | 'requirements' | 'payment';
 type PaymentStatus = 'idle' | 'connecting' | 'signing' | 'verifying' | 'success' | 'error';
 
 export function PaymentModal({ 
@@ -27,13 +27,39 @@ export function PaymentModal({
   gigId,
   agentId 
 }: PaymentModalProps) {
-  const { connected, publicKey, connect, connecting, signMessage } = useWallet();
-  const [step, setStep] = useState<ModalStep>('requirements');
+  const { connected, publicKey, connect, connecting, signMessage, walletType } = useWallet();
+  // Start at 'wallet' step if not connected, otherwise skip to 'requirements'
+  const [step, setStep] = useState<ModalStep>(connected ? 'requirements' : 'wallet');
   const [orderRequirements, setOrderRequirements] = useState<OrderRequirements | null>(null);
   const [status, setStatus] = useState<PaymentStatus>('idle');
   const [error, setError] = useState<string | null>(null);
   const [txSignature, setTxSignature] = useState<string | null>(null);
   const [orderId, setOrderId] = useState<string | null>(null);
+
+  // Auto-advance to requirements when wallet connects
+  useEffect(() => {
+    if (connected && step === 'wallet') {
+      setStep('requirements');
+    }
+  }, [connected, step]);
+
+  // Reset step when modal opens based on wallet state
+  useEffect(() => {
+    if (isOpen) {
+      setStep(connected ? 'requirements' : 'wallet');
+    }
+  }, [isOpen, connected]);
+
+  // Lock body scroll when modal is open to prevent scroll glitch
+  useEffect(() => {
+    if (isOpen) {
+      const originalStyle = window.getComputedStyle(document.body).overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = originalStyle;
+      };
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -146,7 +172,7 @@ export function PaymentModal({
   };
 
   const resetAndClose = () => {
-    setStep('requirements');
+    setStep(connected ? 'requirements' : 'wallet');
     setOrderRequirements(null);
     setStatus('idle');
     setError(null);
@@ -156,17 +182,17 @@ export function PaymentModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden">
       {/* Backdrop */}
       <div 
-        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/70 backdrop-blur-sm touch-none"
         onClick={status === 'success' ? resetAndClose : undefined}
       />
       
       {/* Modal */}
-      <div className="relative bg-gray-800 rounded-2xl p-8 max-w-lg w-full mx-4 border border-gray-700 shadow-2xl max-h-[90vh] overflow-y-auto">
+      <div className="relative bg-gray-800 rounded-2xl p-8 max-w-lg w-full mx-4 border border-gray-700 shadow-2xl max-h-[90vh] overflow-y-auto overscroll-contain">
         {/* Close button */}
-        {(step === 'requirements' || status === 'idle' || status === 'error' || status === 'success') && (
+        {(step === 'wallet' || step === 'requirements' || status === 'idle' || status === 'error' || status === 'success') && (
           <button
             onClick={resetAndClose}
             className="absolute top-4 right-4 text-gray-400 hover:text-white transition"
@@ -175,7 +201,89 @@ export function PaymentModal({
           </button>
         )}
 
-        {/* Step 1: Order Requirements */}
+        {/* Step 1: Wallet Connection */}
+        {step === 'wallet' && (
+          <div className="text-center">
+            <div className="w-20 h-20 bg-orange-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
+              <Wallet className="w-10 h-10 text-orange-400" />
+            </div>
+            <h2 className="text-2xl font-bold text-white mb-2">Connect Your Wallet</h2>
+            <p className="text-gray-400 mb-6">
+              Connect your Solana wallet to place an order for <span className="text-orange-400">{gigTitle}</span>
+            </p>
+
+            {/* Price Preview */}
+            <div className="bg-gray-700/30 rounded-xl p-4 mb-6">
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400">Order Total</span>
+                <span className="text-2xl font-bold text-orange-400">${amount} <span className="text-sm font-normal">USDC</span></span>
+              </div>
+            </div>
+
+            {/* Wallet Selection */}
+            <div className="space-y-3 mb-6">
+              <button
+                onClick={() => connect('phantom')}
+                disabled={connecting}
+                className="w-full bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 text-white py-4 rounded-xl font-semibold transition flex items-center justify-center gap-3"
+              >
+                {connecting ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Connecting...
+                  </>
+                ) : (
+                  <>
+                    <svg width="24" height="24" viewBox="0 0 128 128" fill="white">
+                      <path d="M64 0C28.7 0 0 28.7 0 64s28.7 64 64 64 64-28.7 64-64S99.3 0 64 0zm32.7 72.3c-1.5 1.5-3.5 2.3-5.7 2.3H37c-4.4 0-8-3.6-8-8V37c0-2.2.9-4.2 2.3-5.7 1.5-1.5 3.5-2.3 5.7-2.3h54c4.4 0 8 3.6 8 8v27c0 2.2-.9 4.2-2.3 5.7z"/>
+                    </svg>
+                    Connect Phantom
+                  </>
+                )}
+              </button>
+              <button
+                onClick={() => connect('solflare')}
+                disabled={connecting}
+                className="w-full bg-gradient-to-r from-orange-500 to-yellow-500 hover:from-orange-600 hover:to-yellow-600 disabled:bg-gray-600 text-white py-4 rounded-xl font-semibold transition flex items-center justify-center gap-3"
+              >
+                {connecting ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Connecting...
+                  </>
+                ) : (
+                  <>
+                    <svg width="24" height="24" viewBox="0 0 101 88" fill="white">
+                      <path d="M100.48 69.38L86.17 82.45C81.72 86.62 75.61 88.99 69.27 89H0V44.89L15.83 30.01C20.31 25.81 26.47 23.42 32.87 23.42H69.27L100.48 0V69.38Z"/>
+                    </svg>
+                    Connect Solflare
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* Info */}
+            <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-1">
+                <Lock className="w-4 h-4 text-blue-300" />
+                <span className="text-blue-300 font-semibold text-sm">Why connect first?</span>
+              </div>
+              <p className="text-gray-400 text-xs">
+                We verify you can pay before you fill out order details. This saves your time if there&apos;s an issue with your wallet.
+              </p>
+            </div>
+
+            {/* No Wallet? */}
+            <p className="text-gray-500 text-sm mt-4">
+              Don&apos;t have a wallet?{' '}
+              <a href="https://phantom.app/" target="_blank" rel="noopener noreferrer" className="text-orange-400 hover:text-orange-300 transition">
+                Get Phantom →
+              </a>
+            </p>
+          </div>
+        )}
+
+        {/* Step 2: Order Requirements */}
         {step === 'requirements' && (
           <OrderRequirementsForm
             gigTitle={gigTitle}
@@ -183,7 +291,7 @@ export function PaymentModal({
           />
         )}
 
-        {/* Step 2: Payment */}
+        {/* Step 3: Payment */}
         {step === 'payment' && (
           <>
             {/* Success State */}
