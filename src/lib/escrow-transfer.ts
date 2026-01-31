@@ -23,7 +23,7 @@ const RPC_URL = process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.c
 
 // Get escrow wallet keypair from env
 function getEscrowKeypair(): Keypair {
-  const privateKey = process.env.ESCROW_WALLET_PRIVATE;
+  const privateKey = process.env.ESCROW_WALLET_PRIVATE?.trim();
   if (!privateKey) {
     throw new Error('ESCROW_WALLET_PRIVATE not set');
   }
@@ -32,12 +32,12 @@ function getEscrowKeypair(): Keypair {
 
 // Get escrow wallet public key
 export function getEscrowWalletPublic(): string {
-  return process.env.ESCROW_WALLET_PUBLIC || 'As8dExsrSHRZm6wxZzc6jfHtHB6QutAKqo7TWghpL4Dt';
+  return (process.env.ESCROW_WALLET_PUBLIC || 'As8dExsrSHRZm6wxZzc6jfHtHB6QutAKqo7TWghpL4Dt').trim();
 }
 
 // Platform wallet (receives the 10% fee)
 export function getPlatformWallet(): string {
-  return process.env.PLATFORM_WALLET || '2BcjnU1sSv2f4Uk793ZY59U41LapKMggYmwhiPDrhHfs';
+  return (process.env.PLATFORM_WALLET || '2BcjnU1sSv2f4Uk793ZY59U41LapKMggYmwhiPDrhHfs').trim();
 }
 
 export interface TransferFromEscrowParams {
