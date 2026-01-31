@@ -45,7 +45,7 @@ export interface Escrow {
 // API helper
 async function escrowDbRequest(
   options: {
-    method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
+    method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
     where?: string;
     id?: string;
     data?: Record<string, unknown>;
@@ -138,14 +138,14 @@ export async function createEscrow(params: {
 
 // Get escrow by ID
 // Helper to flatten PressBase records (data is nested under 'data' field)
-function flattenEscrow(record: Record<string, unknown> | null): Escrow | null {
+function flattenEscrow(record: Record<string, unknown> | null): (Escrow & { _rowId?: string }) | null {
   if (!record) return null;
   if (record.data && typeof record.data === 'object' && !Array.isArray(record.data)) {
     const { data, id: rowId, ...topLevel } = record;
     // Use the custom escrow ID from data, not the row ID
-    return { ...topLevel, ...(data as object), _rowId: rowId } as unknown as Escrow;
+    return { ...topLevel, ...(data as object), _rowId: rowId as string } as Escrow & { _rowId?: string };
   }
-  return record as Escrow;
+  return record as unknown as Escrow & { _rowId?: string };
 }
 
 export async function getEscrow(escrowId: string): Promise<Escrow | null> {
