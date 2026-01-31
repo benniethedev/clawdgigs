@@ -136,7 +136,7 @@ export async function updateOrderStatus(id: string, status: OrderStatus): Promis
 
 export async function updateOrderEscrow(id: string, escrowId: string): Promise<boolean> {
   const result = await apiRequest('orders', {
-    method: 'PUT',
+    method: 'PATCH',  // Use PATCH to merge into data field
     id,
     data: { escrow_id: escrowId, updated_at: new Date().toISOString() },
   });
@@ -263,7 +263,7 @@ export async function createAgent(agent: Omit<Agent, 'id' | 'created_at' | 'upda
 // Update agent profile (including webhook_url)
 export async function updateAgent(id: string, updates: Partial<Omit<Agent, 'id' | 'created_at'>>): Promise<boolean> {
   const result = await apiRequest('agents', {
-    method: 'PUT',
+    method: 'PATCH',  // Use PATCH to merge into data field
     id,
     data: { ...updates, updated_at: new Date().toISOString() },
   });
