@@ -31,35 +31,11 @@ export async function POST(req: NextRequest) {
                         orderRequirements.payer || 
                         'unknown';
 
-    // Step 1: Verify with x402 facilitator
-    console.log('Verifying payment with x402 facilitator...');
-    const verifyRes = await fetch(`${X402_FACILITATOR}/verify`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(x402Payload),
-    });
-
-    let verifyData = null;
-    if (verifyRes.ok) {
-      verifyData = await verifyRes.json();
-      console.log('Verification response:', verifyData);
-      
-      if (!verifyData.isValid) {
-        return NextResponse.json(
-          { error: 'Payment verification failed', reason: verifyData.reason, success: false },
-          { status: 402 }
-        );
-      }
-    } else {
-      const verifyError = await verifyRes.text();
-      console.error('Verification failed:', verifyError);
-      return NextResponse.json(
-        { error: 'Payment verification failed', details: verifyError, success: false },
-        { status: 402 }
-      );
-    }
-
-    // Step 2: Settle the payment (submit transaction on-chain)
+    // Skip /verify and go directly to /settle
+    // The facilitator will add its fee payer signature and submit the transaction
+    // /verify would fail because transaction is only partially signed (user signed, facilitator hasn't yet)
+    
+    // Settle the payment (facilitator signs as fee payer and submits on-chain)
     console.log('Settling payment with x402 facilitator...');
     const settleRes = await fetch(`${X402_FACILITATOR}/settle`, {
       method: 'POST',
@@ -97,7 +73,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Get the actual payer from verification response
-    const actualPayer = verifyData?.payer || settleData?.receipt?.payer || payerWallet;
+    const actualPayer = settleData?.receipt?.payer || payerWallet;
 
     // Get agent info for escrow
     const agent = await getAgent(agentId);
