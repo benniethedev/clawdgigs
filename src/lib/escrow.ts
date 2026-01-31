@@ -131,7 +131,14 @@ export async function createEscrow(params: {
   });
 
   if (result.ok && result.data) {
-    return { ok: true, data: result.data as Escrow };
+    // Pressbase returns the row with data nested - flatten it to get our escrow
+    const record = result.data as Record<string, unknown>;
+    const flattened = flattenEscrow(record);
+    if (flattened) {
+      return { ok: true, data: flattened };
+    }
+    // Fallback: return the data we sent (with the generated ID)
+    return { ok: true, data: escrowData as unknown as Escrow };
   }
   return { ok: false, error: result.error || 'Failed to create escrow' };
 }
